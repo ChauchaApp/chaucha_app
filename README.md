@@ -166,3 +166,23 @@ deno test --allow-env --allow-net=none _shared/
 ```
 
 GitHub Actions corre estas mismas verificaciones en cada pull request y en cada push a `master`, además de un `flutter build web` de comprobación.
+
+## Despliegue continuo
+
+Cada push a `master` que pase las verificaciones se publica solo:
+
+| Qué | Workflow | Dónde |
+|---|---|---|
+| App web | `despliegue-web.yml` (corre cuando `App Flutter` termina en verde) | Firebase Hosting: https://chauchaapp1.web.app |
+| Edge Functions | job `desplegar` de `edge-functions.yml` | Supabase |
+
+Configuración del repositorio (Settings → Secrets and variables → Actions):
+
+| Nombre | Tipo | Contenido |
+|---|---|---|
+| `ENV_JSON` | Secreto | El contenido completo de `env.json` |
+| `FIREBASE_SERVICE_ACCOUNT` | Secreto | JSON de una cuenta de servicio de `chauchaapp1` con el rol *Firebase Hosting Admin* |
+| `SUPABASE_ACCESS_TOKEN` | Secreto | Token personal de Supabase (Account → Access Tokens) |
+| `SUPABASE_PROJECT_REF` | Variable | `jfydcvrlfmnlbleecgqr` |
+
+Las migraciones de la base **no** se aplican solas: se revisan y se aplican a mano, porque un error ahí no se deshace con un nuevo despliegue.

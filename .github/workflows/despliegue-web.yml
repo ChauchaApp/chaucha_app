@@ -1,0 +1,73 @@
+# Despliegue continuo de la app web en Firebase Hosting.
+# Corre solo cuando el CI "App Flutter" termina en verde sobre master, así
+# nunca se publica una versión con pruebas rotas.
+#
+# Secretos del repositorio:
+#   ENV_JSON                   contenido completo de env.json
+#   FIREBASE_SERVICE_ACCOUNT   JSON de la cuenta de servicio de chauchaapp1
+name: Despliegue web
+
+on:
+  workflow_run:
+    workflows: ['App Flutter']
+    types: [completed]
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: despliegue-web
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    name: Compilar y publicar en Firebase Hosting
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: produccion-web
+      url: https://chauchaapp1.web.app
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Revisar secretos
+        env:
+          ENV_JSON: ${{ secrets.ENV_JSON }}
+          CUENTA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$ENV_JSON" ] || [ -z "$CUENTA" ]; then
+            echo "::error::Faltan los secretos ENV_JSON o FIREBASE_SERVICE_ACCOUNT."
+            exit 1
+          fi
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.9
+          cache: true
+
+      - name: Dependencias
+        run: flutter pub get
+
+      - name: Crear env.json
+        env:
+          ENV_JSON: ${{ secrets.ENV_JSON }}
+        run: printf '%s' "$ENV_JSON" > env.json
+
+      - name: Compilación web
+        run: flutter build web --release --dart-define-from-file=env.json
+
+      - name: Publicar
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: chauchaapp1
+          channelId: live

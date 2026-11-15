@@ -1,0 +1,18 @@
+{
+  "hosting": {
+    "site": "chauchaapp1",
+    "public": "build/web",
+    "ignore": ["firebase.json", "**/.*"],
+    "rewrites": [{ "source": "**", "destination": "/index.html" }],
+    "headers": [
+      {
+        "source": "**/*.@(js|wasm|json|png|otf|ttf)",
+        "headers": [{ "key": "Cache-Control", "value": "public, max-age=3600" }]
+      },
+      {
+        "source": "@(index.html|flutter_service_worker.js|firebase-messaging-sw.js|version.json)",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      }
+    ]
+  }
+}
