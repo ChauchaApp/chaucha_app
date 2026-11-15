@@ -154,15 +154,34 @@ class _CercaClienteState extends ConsumerState<CercaCliente> {
           );
         }
         final filas = [
-          for (var i = 0; i < lista.length; i++)
+          for (var i = 0; i < lista.length; i++) ...[
             _FilaTecnico(
               tecnico: lista[i],
               cielo: i.isOdd,
               seleccionado: lista[i].id == _seleccionado,
-              onTap: () => setState(() => _seleccionado = lista[i].id),
+              // Tocar de nuevo la fila elegida la cierra.
+              onTap: () => setState(
+                () => _seleccionado = _seleccionado == lista[i].id
+                    ? null
+                    : lista[i].id,
+              ),
               onResaltar: (si) =>
                   setState(() => _resaltado = si ? lista[i].id : null),
             ),
+            // En el celular la lista va debajo del mapa: las acciones se
+            // abren junto a la fila tocada, sin volver a subir al mapa.
+            if (!conScroll)
+              AnimatedSize(
+                duration: Movimiento.de(context, Movimiento.rapido),
+                curve: Movimiento.entrada,
+                child: lista[i].id == _seleccionado
+                    ? _AccionesFila(
+                        onVerPerfil: () => widget.onVerPerfil(lista[i]),
+                        onContactar: () => widget.onContactar(lista[i]),
+                      )
+                    : const SizedBox(width: double.infinity),
+              ),
+          ],
         ];
         if (!conScroll) return Column(children: filas);
         return ListView(children: filas);
@@ -324,6 +343,74 @@ class _MiniTecnico extends StatelessWidget {
     final forma = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(Radios.pequeno),
     );
+    final contactar = TextButton(
+      onPressed: onContactar,
+      style: TextButton.styleFrom(shape: forma),
+      child: const Text('Contactar'),
+    );
+    final verPerfil = FilledButton(
+      onPressed: onVerPerfil,
+      style: FilledButton.styleFrom(
+        minimumSize: const Size(0, 40),
+        shape: forma,
+      ),
+      child: const Text('Ver perfil'),
+    );
+    final cerrar = IconButton(
+      tooltip: 'Cerrar',
+      visualDensity: VisualDensity.compact,
+      onPressed: onCerrar,
+      icon: const Icon(Icons.close_rounded, size: 18),
+    );
+    final datos = Row(
+      children: [
+        FotoPerfilCaja(
+          tamano: 40,
+          circular: true,
+          rutaFoto: t.fotoRuta,
+          iniciales: t.iniciales,
+          estiloTexto: textos.labelLarge?.copyWith(
+            color: Colores.primario,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(width: Espacios.s + 2),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                t.nombreCorto,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textos.labelLarge?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      '$oficio · ',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textos.bodySmall?.copyWith(
+                        color: Colores.tintaSuave,
+                      ),
+                    ),
+                  ),
+                  _Estrella(calificacion: t.calificacion),
+                  Text(
+                    ' · ${Formatos.kilometros(t.metros.toDouble())}',
+                    style: textos.bodySmall?.copyWith(
+                      color: Colores.tintaSuave,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
     return Material(
       color: Colores.tarjeta,
       elevation: 4,
@@ -331,77 +418,82 @@ class _MiniTecnico extends StatelessWidget {
       borderRadius: BorderRadius.circular(14),
       child: Padding(
         padding: const EdgeInsets.all(Espacios.m),
-        child: Row(
-          children: [
-            FotoPerfilCaja(
-              tamano: 40,
-              circular: true,
-              rutaFoto: t.fotoRuta,
-              iniciales: t.iniciales,
-              estiloTexto: textos.labelLarge?.copyWith(
-                color: Colores.primario,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(width: Espacios.s + 2),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    t.nombreCorto,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textos.labelLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
+        // En pantallas angostas los botones bajan a una segunda línea.
+        child: LayoutBuilder(
+          builder: (context, caja) => caja.maxWidth < 440
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(child: datos),
+                        cerrar,
+                      ],
                     ),
-                  ),
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          '$oficio · ',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: textos.bodySmall?.copyWith(
-                            color: Colores.tintaSuave,
-                          ),
-                        ),
-                      ),
-                      _Estrella(calificacion: t.calificacion),
-                      Text(
-                        ' · ${Formatos.kilometros(t.metros.toDouble())}',
-                        style: textos.bodySmall?.copyWith(
-                          color: Colores.tintaSuave,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: Espacios.s),
-            TextButton(
-              onPressed: onContactar,
-              style: TextButton.styleFrom(shape: forma),
-              child: const Text('Contactar'),
-            ),
-            FilledButton(
-              onPressed: onVerPerfil,
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(0, 40),
-                shape: forma,
-              ),
-              child: const Text('Ver perfil'),
-            ),
-            IconButton(
-              tooltip: 'Cerrar',
-              visualDensity: VisualDensity.compact,
-              onPressed: onCerrar,
-              icon: const Icon(Icons.close_rounded, size: 18),
-            ),
-          ],
+                    const SizedBox(height: Espacios.s),
+                    Row(
+                      children: [
+                        Expanded(child: contactar),
+                        const SizedBox(width: Espacios.s),
+                        Expanded(child: verPerfil),
+                      ],
+                    ),
+                  ],
+                )
+              : Row(
+                  children: [
+                    Expanded(child: datos),
+                    const SizedBox(width: Espacios.s),
+                    contactar,
+                    verPerfil,
+                    cerrar,
+                  ],
+                ),
         ),
+      ),
+    );
+  }
+}
+
+/// "Contactar" y "Ver perfil" debajo de la fila elegida (lista apilada).
+class _AccionesFila extends StatelessWidget {
+  const _AccionesFila({required this.onVerPerfil, required this.onContactar});
+
+  final VoidCallback onVerPerfil;
+  final VoidCallback onContactar;
+
+  @override
+  Widget build(BuildContext context) {
+    final forma = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(Radios.pequeno),
+    );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        Espacios.s,
+        Espacios.xs,
+        Espacios.s,
+        Espacios.m,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: onContactar,
+              style: OutlinedButton.styleFrom(shape: forma),
+              icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+              label: const Text('Contactar'),
+            ),
+          ),
+          const SizedBox(width: Espacios.s),
+          Expanded(
+            child: FilledButton.icon(
+              onPressed: onVerPerfil,
+              style: FilledButton.styleFrom(shape: forma),
+              icon: const Icon(Icons.person_outline_rounded, size: 18),
+              label: const Text('Ver perfil'),
+            ),
+          ),
+        ],
       ),
     );
   }

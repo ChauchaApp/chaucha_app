@@ -311,6 +311,47 @@ void main() {
     expect(contenedor.read(oficioInicioProvider), 4);
   });
 
+  testWidgets('en el celular, tocar un técnico abre sus acciones ahí mismo', (
+    tester,
+  ) async {
+    await _montar(
+      tester,
+      const Size(390, 844),
+      tecnicos: const [
+        TecnicoCercano(
+          id: 'r1',
+          nombres: 'Rosa',
+          apellidos: 'Quillupangui Paz',
+          oficios: ['Plomería'],
+          calificacion: 4.8,
+          totalResenas: 9,
+          metros: 900,
+          ubicacion: LatLng(-0.18, -78.48),
+          tarifaBase: 15,
+          nivel: 'Oro',
+        ),
+      ],
+    );
+    final fila = find.text('Rosa Quillupangui').last;
+    await _bajarHasta(tester, fila);
+    final perfil = find.text('Ver perfil');
+    expect(perfil, findsNothing);
+
+    await tester.tap(fila);
+    await tester.pumpAndSettle();
+
+    // Los botones aparecen debajo de la fila tocada y se ven sin subir.
+    expect(perfil, findsWidgets);
+    final boton = tester.getRect(perfil.last);
+    expect(boton.top, greaterThan(tester.getRect(fila).top));
+    expect(boton.bottom, lessThanOrEqualTo(844));
+
+    // Tocar de nuevo la misma fila las cierra.
+    await tester.tap(fila);
+    await tester.pumpAndSettle();
+    expect(perfil, findsNothing);
+  });
+
   testWidgets('sin técnicos en el radio sugiere ampliarlo', (tester) async {
     await _montar(tester, const Size(1280, 1000), tecnicos: const []);
     expect(
