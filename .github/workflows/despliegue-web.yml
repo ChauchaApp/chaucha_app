@@ -32,7 +32,7 @@ jobs:
     timeout-minutes: 25
     environment:
       name: produccion-web
-      url: https://chauchaapp1.web.app
+      url: https://chauchaapp.web.app
     steps:
       - uses: actions/checkout@v4
         with:

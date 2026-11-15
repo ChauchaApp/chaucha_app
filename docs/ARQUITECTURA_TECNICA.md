@@ -339,7 +339,7 @@ Realtime respeta la RLS: cada suscriptor solo recibe las filas que podría leer.
 
 ### 7.2 Correo
 
-- **Lo que existe:** el correo de **Supabase Auth**: confirmación de registro (`signUp`, y `resend` para reenviarlo) y recuperación de contraseña (`resetPasswordForEmail`), en `supabase_auth_repository.dart`. Usa las plantillas de Supabase y **Brevo como servidor SMTP** (configurado en Authentication → SMTP del panel; las credenciales no están en el repositorio). Los enlaces vuelven a la web (`https://chauchaapp1.web.app`) o a la app con `com.eagledev.tecnicosapp://login-callback`, que deben estar en las Redirect URLs de Supabase.
+- **Lo que existe:** el correo de **Supabase Auth**: confirmación de registro (`signUp`, y `resend` para reenviarlo) y recuperación de contraseña (`resetPasswordForEmail`), en `supabase_auth_repository.dart`. Usa las plantillas de Supabase y **Brevo como servidor SMTP** (configurado en Authentication → SMTP del panel; las credenciales no están en el repositorio). Los enlaces vuelven a la web (`https://chauchaapp.web.app`) o a la app con `com.eagledev.tecnicosapp://login-callback`, que deben estar en las Redirect URLs de Supabase.
 - **Lo que no existe:** correo por cambios de estado de una solicitud. Esos avisos llegan por push y por la campana de la app.
 - **Contacto con soporte:** la app abre el cliente de correo del usuario con `mailto:` (`core/widgets/dialogos_info.dart`, `InfoApp.correoSoporte`).
 
@@ -514,7 +514,7 @@ Esta sección reúne las funcionalidades de la app (cliente, técnico y admin) y
 |---|---|---|
 | `app.yml` | Cada PR y cada push a `master` | `flutter analyze`, `flutter test` y `flutter build web` de comprobación |
 | `edge-functions.yml` | Cambios en `supabase/functions/` | `deno check` y pruebas de `_shared`. En `master`, el job `desplegar` publica las 8 funciones en Supabase (CLI fijado en 3.1.0, `enviar-push` y `anuncios` sin JWT) |
-| `despliegue-web.yml` | Cuando `App Flutter` termina en verde sobre `master` | Compila la web con el secreto `ENV_JSON` y la publica en **Firebase Hosting** (`https://chauchaapp1.web.app`) |
+| `despliegue-web.yml` | Cuando `App Flutter` termina en verde sobre `master` | Compila la web con el secreto `ENV_JSON` y la publica en **Firebase Hosting** (`https://chauchaapp.web.app`) |
 
 - **Secretos del repositorio:** `ENV_JSON`, `FIREBASE_SERVICE_ACCOUNT`, `SUPABASE_ACCESS_TOKEN` y la variable `SUPABASE_PROJECT_REF`.
 - **Fusionar el PR es el único paso manual:** desde ahí, las pruebas y los despliegues son automáticos.
