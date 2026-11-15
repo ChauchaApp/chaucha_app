@@ -15,7 +15,7 @@ flowchart LR
   end
 
   subgraph Hosting["Firebase Hosting"]
-    WEB["chauchaapp1.web.app"]
+    WEB["chauchaapp.web.app"]
   end
 
   APP["App Flutter<br/>Web y Android (un solo código)"]

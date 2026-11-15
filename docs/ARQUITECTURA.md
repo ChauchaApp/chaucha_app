@@ -60,7 +60,7 @@ modifique el cliente.
 | **OpenStreetMap** | Teselas del mapa y barrio de cada punto (Nominatim) | Gratis y abierto. Nominatim permite 1 consulta por segundo para toda la app: la función `sector` respeta ese límite y guarda el resultado 30 días. |
 | **Upstash Redis** | Caché (barrios, anuncios, veredictos de selfie), presencia "En línea" y límites de uso de las funciones | Contadores con caducidad y estado que el servidor puede leer. Se usa por HTTP porque las Edge Functions no mantienen conexiones. Es *fail-open*: si falla, todo sigue funcionando sin él. |
 | **Brevo** | SMTP de Supabase Auth: confirmación de cuenta y recuperación de contraseña | El SMTP por defecto de Supabase tiene un límite muy bajo de correos por hora; con Brevo los correos llegan sin ese tope. Se configura en el panel de Supabase, no en el código. |
-| **Firebase Hosting** | Publicar la app web (`chauchaapp1.web.app`) | Gratis y en la raíz del dominio: el *service worker* de las notificaciones y los enlaces de confirmación de correo funcionan sin subrutas. Lo usa el despliegue continuo. |
+| **Firebase Hosting** | Publicar la app web (`chauchaapp.web.app`) | Gratis y en la raíz del dominio: el *service worker* de las notificaciones y los enlaces de confirmación de correo funcionan sin subrutas. Lo usa el despliegue continuo. |
 | **GitHub Actions** | CI/CD | Pruebas en cada PR; al fusionar en `master` publica la web y las Edge Functions. Las migraciones se aplican a mano. |
 
 ---

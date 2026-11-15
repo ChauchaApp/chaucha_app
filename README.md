@@ -182,7 +182,7 @@ Cada push a `master` que pase las verificaciones se publica solo:
 
 | Qué | Workflow | Dónde |
 |---|---|---|
-| App web | `despliegue-web.yml` (corre cuando `App Flutter` termina en verde) | Firebase Hosting: https://chauchaapp1.web.app |
+| App web | `despliegue-web.yml` (corre cuando `App Flutter` termina en verde) | Firebase Hosting: https://chauchaapp.web.app |
 | Edge Functions | job `desplegar` de `edge-functions.yml` | Supabase |
 
 Configuración del repositorio (Settings → Secrets and variables → Actions):
