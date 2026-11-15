@@ -192,18 +192,22 @@ class _SolicitudDetalleViewState extends ConsumerState<SolicitudDetalleView> {
 
   Future<void> _ofrecer() async {
     final perfil = await ref.read(perfilTecnicoProvider.future);
+    final detalle = await ref.read(
+      detalleSolicitudProvider(widget.solicitudId).future,
+    );
     if (!mounted) return;
-    if (perfil.tarifaBase <= 0) {
+    final oficio = detalle.solicitud;
+    // Cada oficio tiene su propio precio de visita.
+    final tarifa = perfil.tarifaPara(oficio.oficioId);
+    if (tarifa <= 0) {
       context.mostrarMensaje(
-        'Configura tu tarifa base en Mi perfil antes de ofertar.',
+        'Configura el precio de la visita de ${oficio.oficioNombre} en Mi '
+        'perfil antes de ofertar.',
         tipo: TipoMensaje.error,
       );
       return;
     }
-    final solucion = await mostrarFormularioOferta(
-      context,
-      tarifaBase: perfil.tarifaBase,
-    );
+    final solucion = await mostrarFormularioOferta(context, tarifaBase: tarifa);
     if (solucion == null || !mounted) return;
     // Cada oferta exige confirmar con el rostro que es el técnico.
     if (!await confirmarIdentidadParaOfertar(context, ref) || !mounted) return;

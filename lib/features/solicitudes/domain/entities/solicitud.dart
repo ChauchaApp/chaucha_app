@@ -1,5 +1,7 @@
 import 'package:latlong2/latlong.dart';
 
+import 'vehiculo.dart';
+
 enum EstadoSolicitud {
   abierta,
   cotizada,
@@ -26,6 +28,7 @@ class Solicitud {
     this.clienteNombre,
     this.clienteFotoRuta,
     this.clienteVerificado = false,
+    this.vehiculo,
     this.completadaEn,
   });
 
@@ -49,6 +52,9 @@ class Solicitud {
 
   /// La identidad del cliente está verificada.
   final bool clienteVerificado;
+
+  /// Datos del vehículo, si es una solicitud de mecánica o llantería.
+  final Vehiculo? vehiculo;
 
   String get clienteIniciales {
     final partes = (clienteNombre ?? '').split(' ').where((p) => p.isNotEmpty);

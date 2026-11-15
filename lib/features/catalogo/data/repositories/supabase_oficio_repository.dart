@@ -21,7 +21,7 @@ class SupabaseOficioRepository implements OficioRepository {
     return supabaseGuard(() async {
       final filas = await _client
           .from('oficios')
-          .select('id, nombre')
+          .select('id, nombre, categoria')
           .order('nombre');
       return filas
           .map((fila) => OficioModel.fromJson(fila).aEntidad())

@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
@@ -25,8 +25,10 @@ import '../../../../core/widgets/tarjeta_app.dart';
 import '../../../auth/presentation/providers/sesion_provider.dart';
 import '../../../catalogo/domain/entities/oficio.dart';
 import '../../../catalogo/presentation/providers/oficios_provider.dart';
+import '../../../catalogo/presentation/widgets/icono_oficio.dart';
 import '../../../perfil_puntos/presentation/views/aviso_verificacion_cliente.dart';
 import '../../domain/entities/nueva_solicitud.dart';
+import '../../domain/entities/vehiculo.dart';
 import '../providers/crear_solicitud_provider.dart';
 import '../widgets/solicitud_publicada.dart';
 
@@ -44,6 +46,10 @@ class _CrearSolicitudViewState extends ConsumerState<CrearSolicitudView> {
   final _formKey = GlobalKey<FormState>();
   final _descripcion = TextEditingController();
   final _direccion = TextEditingController();
+  final _marca = TextEditingController();
+  final _modelo = TextEditingController();
+  final _anio = TextEditingController();
+  TipoVehiculo? _tipoVehiculo;
 
   int? _oficioId;
   LatLng _ubicacion = GeoMapper.quito;
@@ -64,8 +70,9 @@ class _CrearSolicitudViewState extends ConsumerState<CrearSolicitudView> {
 
   @override
   void dispose() {
-    _descripcion.dispose();
-    _direccion.dispose();
+    for (final c in [_descripcion, _direccion, _marca, _modelo, _anio]) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -119,6 +126,7 @@ class _CrearSolicitudViewState extends ConsumerState<CrearSolicitudView> {
           direccion: _direccion.text,
           ubicacion: _ubicacion,
           fotos: _fotos,
+          vehiculo: _esVehiculo ? _vehiculo() : null,
         );
     if (!mounted) return;
     if (id != null) {
@@ -129,6 +137,107 @@ class _CrearSolicitudViewState extends ConsumerState<CrearSolicitudView> {
         tipo: TipoMensaje.error,
       );
     }
+  }
+
+  /// El oficio elegido es de vehículos (mecánica, llantería...).
+  bool get _esVehiculo {
+    final oficios = ref.read(oficiosProvider).value ?? const <Oficio>[];
+    return oficios.any((o) => o.id == _oficioId && o.esVehiculo);
+  }
+
+  Vehiculo _vehiculo() => Vehiculo(
+    tipo: _tipoVehiculo,
+    marca: _marca.text,
+    modelo: _modelo.text,
+    anio: int.tryParse(_anio.text.trim()),
+  );
+
+  static String? _validarAnio(String? v) {
+    final texto = (v ?? '').trim();
+    if (texto.isEmpty) return null;
+    final anio = int.tryParse(texto);
+    final maximo = DateTime.now().year + 1;
+    if (anio == null || anio < 1950 || anio > maximo) {
+      return 'Año entre 1950 y $maximo.';
+    }
+    return null;
+  }
+
+  /// Datos opcionales del vehículo, para que el técnico sepa qué llevar.
+  Widget _datosVehiculo() {
+    final textos = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: Espacios.l),
+        Text(
+          'Datos del vehículo',
+          style: textos.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        Text(
+          'Opcional · ayudan al técnico a saber qué llevar.',
+          style: textos.bodySmall?.copyWith(color: Colores.tintaSuave),
+        ),
+        const SizedBox(height: Espacios.s),
+        Wrap(
+          spacing: Espacios.s,
+          runSpacing: Espacios.s,
+          children: [
+            for (final tipo in TipoVehiculo.values)
+              ChoiceChip(
+                label: Text(tipo.etiqueta),
+                selected: _tipoVehiculo == tipo,
+                onSelected: (sel) =>
+                    setState(() => _tipoVehiculo = sel ? tipo : null),
+              ),
+          ],
+        ),
+        const SizedBox(height: Espacios.m),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _marca,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(
+                  labelText: 'Marca',
+                  hintText: 'Chevrolet',
+                ),
+              ),
+            ),
+            const SizedBox(width: Espacios.m),
+            Expanded(
+              child: TextFormField(
+                controller: _modelo,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(
+                  labelText: 'Modelo',
+                  hintText: 'Aveo',
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: Espacios.m),
+        SizedBox(
+          width: 160,
+          child: TextFormField(
+            controller: _anio,
+            keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(4),
+            ],
+            decoration: const InputDecoration(
+              labelText: 'Año',
+              hintText: '2015',
+            ),
+            validator: _validarAnio,
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -186,13 +295,16 @@ class _CrearSolicitudViewState extends ConsumerState<CrearSolicitudView> {
               controller: _descripcion,
               minLines: 3,
               maxLines: 6,
-              decoration: const InputDecoration(
-                hintText: 'Ej.: la llave del lavabo gotea desde ayer',
+              decoration: InputDecoration(
+                hintText: _esVehiculo
+                    ? 'Ej.: el carro no arranca y hace un clic'
+                    : 'Ej.: la llave del lavabo gotea desde ayer',
               ),
               validator: (v) =>
                   FormValidators.requerido(v, campo: 'La descripción'),
             ),
           ),
+          if (_esVehiculo) _datosVehiculo(),
           const SizedBox(height: Espacios.l),
           CampoEtiquetado(
             etiqueta: 'Referencia de la dirección',
@@ -291,6 +403,7 @@ class _CrearSolicitudViewState extends ConsumerState<CrearSolicitudView> {
               children: [
                 for (final oficio in oficios)
                   ChoiceChip(
+                    avatar: Icon(iconoOficio(oficio.nombre), size: 18),
                     label: Text(oficio.nombre),
                     selected: _oficioId == oficio.id,
                     onSelected: (_) {

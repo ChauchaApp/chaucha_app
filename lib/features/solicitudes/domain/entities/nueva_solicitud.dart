@@ -2,6 +2,8 @@ import 'dart:typed_data';
 
 import 'package:latlong2/latlong.dart';
 
+import 'vehiculo.dart';
+
 class NuevaSolicitud {
   const NuevaSolicitud({
     required this.oficioId,
@@ -9,6 +11,7 @@ class NuevaSolicitud {
     required this.ubicacion,
     required this.fotos,
     this.direccionReferencia,
+    this.vehiculo,
   });
 
   /// Fotos del problema permitidas por solicitud.
@@ -19,4 +22,7 @@ class NuevaSolicitud {
   final LatLng ubicacion;
   final String? direccionReferencia;
   final List<Uint8List> fotos;
+
+  /// Solo en oficios de vehículos.
+  final Vehiculo? vehiculo;
 }

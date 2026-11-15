@@ -42,6 +42,23 @@ void main() {
       expect(perfil.estaCompleto, isTrue);
     });
 
+    test('precio de la visita por oficio, con la tarifa base de respaldo', () {
+      final perfil = _leer({
+        'usuario_id': 't1',
+        'tarifa_base': 10,
+        'tecnico_oficios': [
+          {'oficio_id': 1, 'tarifa_visita': '12.50'},
+          {'oficio_id': 21, 'tarifa_visita': 25},
+          {'oficio_id': 3, 'tarifa_visita': null},
+        ],
+      });
+
+      expect(perfil.tarifas, {1: 12.5, 21: 25.0});
+      expect(perfil.tarifaPara(1), 12.5);
+      expect(perfil.tarifaPara(21), 25);
+      expect(perfil.tarifaPara(3), 10);
+    });
+
     test('lee la ubicación en formato WKT', () {
       final perfil = _leer({
         'usuario_id': 't1',

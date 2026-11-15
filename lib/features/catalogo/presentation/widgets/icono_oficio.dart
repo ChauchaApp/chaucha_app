@@ -3,6 +3,12 @@ import 'package:flutter/material.dart';
 /// Ícono de cada oficio del catálogo (por nombre).
 IconData iconoOficio(String nombre) {
   final n = nombre.toLowerCase();
+  // Vehículos primero: "Electricidad automotriz" no es el rayo del hogar.
+  if (n.contains('moto')) return Icons.two_wheeler;
+  if (n.contains('llant') || n.contains('vulcan')) return Icons.tire_repair;
+  if (n.contains('automotriz') || n.contains('mecán') || n.contains('mecan')) {
+    return Icons.car_repair;
+  }
   if (n.contains('plom')) return Icons.plumbing;
   if (n.contains('electr')) return Icons.bolt;
   if (n.contains('cerraj')) return Icons.vpn_key_outlined;

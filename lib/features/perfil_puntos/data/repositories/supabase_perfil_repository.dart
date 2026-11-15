@@ -78,8 +78,24 @@ class SupabasePerfilRepository implements PerfilRepository {
       }
       if (agregar.isNotEmpty) {
         await _client.from('tecnico_oficios').insert([
-          for (final id in agregar) {'tecnico_id': uid, 'oficio_id': id},
+          for (final id in agregar)
+            {
+              'tecnico_id': uid,
+              'oficio_id': id,
+              'tarifa_visita': cambios.tarifas[id] ?? cambios.tarifaBase,
+            },
         ]);
+      }
+      // Precio de la visita de los oficios que ya tenía.
+      for (final entrada in cambios.tarifas.entries) {
+        if (!ids.contains(entrada.key) || quitar.contains(entrada.key)) {
+          continue;
+        }
+        await _client
+            .from('tecnico_oficios')
+            .update({'tarifa_visita': entrada.value})
+            .eq('tecnico_id', uid)
+            .eq('oficio_id', entrada.key);
       }
     });
   }

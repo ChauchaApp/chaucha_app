@@ -16,6 +16,7 @@ class PerfilTecnicoModel {
     required this.nivelNombre,
     required this.comisionPorcentaje,
     required this.oficioIds,
+    this.tarifas = const {},
     this.ubicacionActual,
     this.rangoBonusM = 0,
   });
@@ -39,6 +40,11 @@ class PerfilTecnicoModel {
         for (final fila in oficios.whereType<Map<String, dynamic>>())
           aInt(fila['oficio_id']),
       ],
+      tarifas: {
+        for (final fila in oficios.whereType<Map<String, dynamic>>())
+          if (fila['tarifa_visita'] != null)
+            aInt(fila['oficio_id']): aDouble(fila['tarifa_visita']),
+      },
     );
   }
 
@@ -47,7 +53,7 @@ class PerfilTecnicoModel {
       'usuario_id, tarifa_base, rango_cobertura_m, rango_bonus_m, '
       'ubicacion_actual, puntos, calificacion_promedio, total_resenas, '
       'verificado, niveles_gamificacion(nombre, comision_porcentaje), '
-      'tecnico_oficios(oficio_id)';
+      'tecnico_oficios(oficio_id, tarifa_visita)';
 
   final String usuarioId;
   final double tarifaBase;
@@ -61,6 +67,7 @@ class PerfilTecnicoModel {
   final String nivelNombre;
   final double comisionPorcentaje;
   final List<int> oficioIds;
+  final Map<int, double> tarifas;
 
   PerfilTecnico aEntidad() => PerfilTecnico(
     usuarioId: usuarioId,
@@ -75,5 +82,6 @@ class PerfilTecnicoModel {
     nivelNombre: nivelNombre,
     comisionPorcentaje: comisionPorcentaje,
     oficioIds: oficioIds,
+    tarifas: tarifas,
   );
 }
