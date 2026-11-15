@@ -71,13 +71,13 @@ class AvisoVerificacionCliente extends ConsumerWidget {
                   children: [
                     Text(
                       enRevision
-                          ? 'Perfil en revisión'
+                          ? 'Verificación en proceso'
                           : 'Falta verificar tu identidad',
                       style: textos.titleSmall,
                     ),
                     Text(
                       enRevision
-                          ? 'Tu verificación se realizará pronto.'
+                          ? 'Es automática y toma unos minutos.'
                           : subtitulo,
                       style: textos.bodySmall?.copyWith(
                         color: Colores.tintaSuave,

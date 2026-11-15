@@ -32,7 +32,14 @@ final oficioInicioProvider = NotifierProvider<OficioInicio, int?>(
   OficioInicio.new,
 );
 
+/// La ubicación con la que se busca en toda la app: la guardada en el
+/// perfil ("Mi ubicación"). Si cambia ahí, se recalcula todo lo que depende
+/// de ella. Sin una guardada, el GPS; sin GPS, el centro de Quito.
 final ubicacionInicioProvider = FutureProvider.autoDispose<LatLng>((ref) async {
+  final guardada = ref.watch(
+    usuarioActualProvider.select((u) => u?.ubicacionRegistro),
+  );
+  if (guardada != null) return guardada;
   final actual = await ref.watch(ubicacionServiceProvider).obtenerActual();
   return actual ?? GeoMapper.quito;
 });

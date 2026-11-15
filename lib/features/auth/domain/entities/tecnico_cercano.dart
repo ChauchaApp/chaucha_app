@@ -13,6 +13,8 @@ class TecnicoCercano {
     required this.tarifaBase,
     required this.nivel,
     this.fotoRuta,
+    this.plan = 'gratis',
+    this.destacado = false,
   });
 
   final String id;
@@ -26,6 +28,20 @@ class TecnicoCercano {
   final double tarifaBase;
   final String nivel;
   final String? fotoRuta;
+
+  /// Plan del técnico: `gratis`, `pro` o `plus`.
+  final String plan;
+
+  /// Sale primero por su plan. Se muestra con la etiqueta "Destacado" para
+  /// que el cliente sepa por qué aparece arriba.
+  final bool destacado;
+
+  /// Orden ante el cliente: primero el plan, después la distancia.
+  int get prioridadPlan => switch (plan) {
+    'plus' => 3,
+    'pro' => 2,
+    _ => 1,
+  };
 
   String get primerNombre => nombres.split(' ').first;
 

@@ -15,6 +15,10 @@ class PerfilTecnico {
     this.tarifas = const {},
     this.ubicacionActual,
     this.rangoBonusM = 0,
+    this.planCodigo = 'gratis',
+    this.rangoMaxPlanM,
+    this.oficiosMaxPlan,
+    this.oficiosPausados = const [],
   });
 
   final String usuarioId;
@@ -33,6 +37,19 @@ class PerfilTecnico {
   final double comisionPorcentaje;
   final List<int> oficioIds;
 
+  /// Plan de suscripción vigente: `gratis`, `pro` o `plus`.
+  final String planCodigo;
+
+  /// Tope de rango del plan. Null: sin tope (datos viejos).
+  final int? rangoMaxPlanM;
+
+  /// Cuántos oficios activos permite el plan. Null: sin tope.
+  final int? oficiosMaxPlan;
+
+  /// Oficios pausados al bajar de plan: no aparecen en el feed hasta que el
+  /// técnico los vuelva a activar.
+  final List<int> oficiosPausados;
+
   /// Precio de la visita por oficio (id del oficio → precio).
   final Map<int, double> tarifas;
 
@@ -42,8 +59,15 @@ class PerfilTecnico {
     return propia != null && propia > 0 ? propia : tarifaBase;
   }
 
-  /// Rango con el que realmente se buscan solicitudes (máx. 50 km).
-  int get rangoEfectivoM => (rangoCoberturaM + rangoBonusM).clamp(0, 50000);
+  /// Rango con el que realmente se buscan solicitudes: el elegido, con el
+  /// tope del plan, más el bono por reputación (máx. 50 km).
+  int get rangoEfectivoM {
+    final tope = rangoMaxPlanM;
+    final base = tope != null && tope < rangoCoberturaM
+        ? tope
+        : rangoCoberturaM;
+    return (base + rangoBonusM).clamp(0, 50000);
+  }
 
   /// Sin oficios o sin ubicación, el técnico no puede ver solicitudes.
   bool get estaCompleto => oficioIds.isNotEmpty && ubicacionActual != null;

@@ -19,11 +19,19 @@ class PerfilTecnicoModel {
     this.tarifas = const {},
     this.ubicacionActual,
     this.rangoBonusM = 0,
+    this.planCodigo = 'gratis',
+    this.rangoMaxPlanM,
+    this.oficiosMaxPlan,
+    this.oficiosPausados = const [],
   });
 
   factory PerfilTecnicoModel.fromJson(Map<String, dynamic> json) {
     final nivel = anidado(json['niveles_gamificacion']);
-    final oficios = (json['tecnico_oficios'] as List?) ?? const [];
+    final filas = ((json['tecnico_oficios'] as List?) ?? const [])
+        .whereType<Map<String, dynamic>>();
+    // Sin la columna `activo` (datos viejos), todos cuentan como activos.
+    bool activo(Map<String, dynamic> f) => f['activo'] as bool? ?? true;
+    final oficios = filas.where(activo);
     return PerfilTecnicoModel(
       usuarioId: json['usuario_id'] as String,
       tarifaBase: aDouble(json['tarifa_base']),
@@ -36,12 +44,20 @@ class PerfilTecnicoModel {
       verificado: json['verificado'] as bool? ?? false,
       nivelNombre: nivel?['nombre'] as String? ?? 'Sin nivel',
       comisionPorcentaje: aDouble(nivel?['comision_porcentaje']),
-      oficioIds: [
-        for (final fila in oficios.whereType<Map<String, dynamic>>())
-          aInt(fila['oficio_id']),
+      oficioIds: [for (final fila in oficios) aInt(fila['oficio_id'])],
+      oficiosPausados: [
+        for (final fila in filas)
+          if (!activo(fila)) aInt(fila['oficio_id']),
       ],
+      planCodigo: json['plan_codigo'] as String? ?? 'gratis',
+      rangoMaxPlanM: json['plan_rango_max_m'] == null
+          ? null
+          : aInt(json['plan_rango_max_m']),
+      oficiosMaxPlan: json['plan_oficios_max'] == null
+          ? null
+          : aInt(json['plan_oficios_max']),
       tarifas: {
-        for (final fila in oficios.whereType<Map<String, dynamic>>())
+        for (final fila in filas)
           if (fila['tarifa_visita'] != null)
             aInt(fila['oficio_id']): aDouble(fila['tarifa_visita']),
       },
@@ -53,7 +69,8 @@ class PerfilTecnicoModel {
       'usuario_id, tarifa_base, rango_cobertura_m, rango_bonus_m, '
       'ubicacion_actual, puntos, calificacion_promedio, total_resenas, '
       'verificado, niveles_gamificacion(nombre, comision_porcentaje), '
-      'tecnico_oficios(oficio_id, tarifa_visita)';
+      'tecnico_oficios(oficio_id, tarifa_visita, activo), '
+      'plan_codigo, plan_rango_max_m, plan_oficios_max';
 
   final String usuarioId;
   final double tarifaBase;
@@ -68,6 +85,10 @@ class PerfilTecnicoModel {
   final double comisionPorcentaje;
   final List<int> oficioIds;
   final Map<int, double> tarifas;
+  final String planCodigo;
+  final int? rangoMaxPlanM;
+  final int? oficiosMaxPlan;
+  final List<int> oficiosPausados;
 
   PerfilTecnico aEntidad() => PerfilTecnico(
     usuarioId: usuarioId,
@@ -83,5 +104,9 @@ class PerfilTecnicoModel {
     comisionPorcentaje: comisionPorcentaje,
     oficioIds: oficioIds,
     tarifas: tarifas,
+    planCodigo: planCodigo,
+    rangoMaxPlanM: rangoMaxPlanM,
+    oficiosMaxPlan: oficiosMaxPlan,
+    oficiosPausados: oficiosPausados,
   );
 }

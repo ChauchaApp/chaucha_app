@@ -62,8 +62,12 @@ class _CercaClienteState extends ConsumerState<CercaCliente> {
     final oficio = ref.watch(oficioInicioProvider);
     final km = _km ?? ref.watch(radioInicioProvider) / 1000;
 
+    // Primero el plan (los destacados arriba), después la distancia.
     final lista = [...?tecnicos.value]
-      ..sort((a, b) => a.metros.compareTo(b.metros));
+      ..sort((a, b) {
+        final plan = b.prioridadPlan.compareTo(a.prioridadPlan);
+        return plan != 0 ? plan : a.metros.compareTo(b.metros);
+      });
     TecnicoCercano? elegido;
     for (final t in lista) {
       if (t.id == _seleccionado) elegido = t;
@@ -103,7 +107,11 @@ class _CercaClienteState extends ConsumerState<CercaCliente> {
               pin: (resaltado, seleccionado) => PinCircular(
                 resaltado: resaltado,
                 seleccionado: seleccionado,
-                color: i.isOdd ? Colores.cieloSuave : Colores.primarioSuave,
+                color: lista[i].destacado
+                    ? Colores.avisoSuave
+                    : i.isOdd
+                    ? Colores.cieloSuave
+                    : Colores.primarioSuave,
                 child: FotoPerfilCaja(
                   tamano: 38,
                   circular: true,
@@ -242,6 +250,14 @@ class _FilaTecnico extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     _Estrella(calificacion: t.calificacion),
+                    if (t.destacado)
+                      Text(
+                        'Destacado',
+                        style: textos.labelSmall?.copyWith(
+                          color: Colores.avisoOscuro,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
                     Text(
                       'Verificado',
                       style: textos.labelSmall?.copyWith(

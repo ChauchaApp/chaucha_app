@@ -69,3 +69,9 @@ class RevisarCertificacionNotifier extends AsyncNotifier<void> {
     return !resultado.hasError;
   }
 }
+
+/// Cuántos certificados esperan revisión (insignia de la pestaña).
+final certificadosPendientesConteoProvider = FutureProvider.autoDispose<int>(
+  (ref) async =>
+      (await ref.watch(certificacionesPendientesProvider.future)).length,
+);

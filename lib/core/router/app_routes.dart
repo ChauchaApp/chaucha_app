@@ -53,6 +53,12 @@ abstract final class AppRoutes {
     bool esAdmin = false,
   }) => '${esAdmin ? adminInicio : _prefijo(esCliente)}/reclamo/$id';
 
+  /// Planes de suscripción (solo técnicos).
+  static const String planes = '$tecnicoInicio/planes';
+
+  /// Pasarela de pago (simulada) de un plan.
+  static String pagarPlan(String codigo) => '$planes/pagar/$codigo';
+
   static String misReclamos({required bool esCliente}) =>
       '${_prefijo(esCliente)}/reclamos';
 
