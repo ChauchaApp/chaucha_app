@@ -73,7 +73,7 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 3.1.0
 
       # Las que llama la app: exigen el JWT del usuario.
       - name: Funciones con sesión
@@ -82,10 +82,10 @@ jobs:
           validar-foto-rostro comparar-rostro-cedula
           verificar-rostro-sesion verificar-rostro-postulacion
           sector presencia
-          --project-ref "$PROYECTO" --use-api
+          --project-ref "$PROYECTO" --use-api --yes
 
       # Las que llama la base con pg_net: se protegen con x-push-secreto.
       - name: Funciones del servidor (sin JWT)
         run: >-
           supabase functions deploy enviar-push anuncios
-          --project-ref "$PROYECTO" --use-api --no-verify-jwt
+          --project-ref "$PROYECTO" --use-api --no-verify-jwt --yes
