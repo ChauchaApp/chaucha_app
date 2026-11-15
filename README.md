@@ -23,6 +23,7 @@ La app es una sola base de código en **Flutter** (web y Android). El backend es
 - Ve en un mapa las solicitudes de sus oficios dentro de su radio de cobertura, y envía propuestas y tickets.
 - Tiene su agenda (Mes, Semana, Lista), su nivel y sus puntos (Bronce, Plata, Oro) y sus certificaciones.
 - Ofrece oficios de hogar y de vehículos, con un precio de visita por oficio.
+- Paga su suscripción en una **pasarela de pago simulada** (demostración, no cobra): la tarjeta se valida en el teléfono y al servidor solo llegan la marca y los últimos 4 dígitos. `4242 4242 4242 4242` se aprueba; una tarjeta terminada en `0002` se rechaza.
 
 **Administración**
 - Panel con resumen, reclamos, certificados por aprobar, solicitudes y usuarios. La identidad no pasa por el admin: se verifica sola.
@@ -53,8 +54,9 @@ La app es una sola base de código en **Flutter** (web y Android). El backend es
 | IA y rostro | Google Gemini (visión): validación de la selfie y lectura de la cédula. AWS Rekognition: comparación de rostros (cédula, inicio de sesión y cada postulación) |
 | Multihilo | `isolate_manager`: procesamiento de imágenes en isolates (Android) y Web Workers (web) |
 | Notificaciones | Firebase Cloud Messaging (push en Android y web) |
+| Correo | Supabase Auth con Brevo como servidor SMTP (confirmación de cuenta y recuperación de contraseña) |
 | Caché, límites y presencia | Upstash Redis (REST) desde las Edge Functions |
-| CI | GitHub Actions |
+| CI/CD | GitHub Actions: pruebas en cada PR y despliegue automático de la web (Firebase Hosting) y las Edge Functions al fusionar en `master` |
 
 ---
 
@@ -131,7 +133,7 @@ supabase functions deploy validar-foto-rostro comparar-rostro-cedula sector pres
 supabase functions deploy enviar-push anuncios --no-verify-jwt
 ```
 
-**Datos de demostración:** [`supabase/semilla/semilla_quito.sql`](supabase/semilla/semilla_quito.sql) crea 60 técnicos y 90 clientes repartidos por todo Quito (norte, centro, sur y valles). Todos están verificados y tienen historial: solicitudes en todos los estados, chats, tickets, agenda, reseñas, reclamos y certificaciones. Las cuentas usan el dominio `@semilla.chaucha.app`. Antes de correrlo, reemplaza `__CLAVE__` por la contraseña que tendrán las cuentas; la contraseña no va en el repositorio.
+**Datos de demostración:** [`supabase/semilla/semilla_quito.sql`](supabase/semilla/semilla_quito.sql) crea 60 técnicos y 90 clientes repartidos por todo Quito (norte, centro, sur y valles). Todos están verificados y tienen historial: solicitudes en todos los estados, chats, tickets, agenda, reseñas, reclamos, certificaciones y pagos. Las cuentas usan el dominio `@semilla.chaucha.app`. Antes de correrlo, reemplaza `__CLAVE__` por la contraseña que tendrán las cuentas; la contraseña no va en el repositorio.
 
 ---
 
