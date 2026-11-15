@@ -55,3 +55,6 @@ env.json
 # Artefactos del generador de Web Workers
 web/*.js.deps
 web/*.js.map
+
+# Caché del CLI de Firebase
+.firebase/
