@@ -1,7 +1,7 @@
 # ChauchaApp
 
-[![App Flutter](https://github.com/mangodev-hub/chaucha_app/actions/workflows/app.yml/badge.svg)](https://github.com/mangodev-hub/chaucha_app/actions/workflows/app.yml)
-[![Edge Functions](https://github.com/mangodev-hub/chaucha_app/actions/workflows/edge-functions.yml/badge.svg)](https://github.com/mangodev-hub/chaucha_app/actions/workflows/edge-functions.yml)
+[![App Flutter](https://github.com/ChauchaApp/chaucha_app/actions/workflows/app.yml/badge.svg)](https://github.com/ChauchaApp/chaucha_app/actions/workflows/app.yml)
+[![Edge Functions](https://github.com/ChauchaApp/chaucha_app/actions/workflows/edge-functions.yml/badge.svg)](https://github.com/ChauchaApp/chaucha_app/actions/workflows/edge-functions.yml)
 
 Plataforma que conecta a clientes con **técnicos a domicilio verificados** (plomería, electricidad, cerrajería, pintura y más) en Ecuador. Proyecto de EagleDev 2026.
 
