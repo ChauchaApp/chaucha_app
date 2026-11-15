@@ -1,6 +1,7 @@
 # ChauchaApp: arquitectura y tecnologías
 
-Los diagramas están en [ARQUITECTURA_DIAGRAMA.md](ARQUITECTURA_DIAGRAMA.md).
+Los diagramas están en [ARQUITECTURA_DIAGRAMA.md](ARQUITECTURA_DIAGRAMA.md) y el detalle
+de cada pieza en [ARQUITECTURA_TECNICA.md](ARQUITECTURA_TECNICA.md).
 
 ## En una frase
 
@@ -20,7 +21,7 @@ modifique el cliente.
 | **go_router** | Navegación y rutas protegidas por rol | Redirige según la sesión (login, completar perfil, cliente, técnico, admin) en un solo lugar. |
 | **supabase_flutter** | Login, consultas, RPC, Realtime y Storage | SDK oficial: un solo paquete para todo el backend. |
 | **flutter_map + OpenStreetMap** | Mapa de técnicos cercanos y zona de trabajo | Gratis y sin clave de API. Google Maps pide tarjeta y factura por uso. |
-| **geolocator** | Ubicación del usuario | Para buscar técnicos cerca y fijar la zona del técnico. |
+| **geolocator** | Ubicación del usuario | Solo como respaldo: la ubicación que manda en toda la app es la guardada en el perfil (ver "Otras decisiones"). |
 | **camera / image_picker / file_selector** | Selfie, cédula, fotos del problema, certificados | La selfie se toma **solo con cámara en vivo**, sin galería, para evitar fotos de fotos. |
 | **image** | Detectar fotos borrosas y preparar cada foto antes de subirla (`core/hilos/tareas.dart`) | Varianza del Laplaciano: barato, sin servicios externos y avisa al instante. |
 | **isolate_manager** | Procesar imágenes en otro hilo (`core/hilos`) | Isolates en Android y Web Workers en web: la pantalla no se congela. |
@@ -34,7 +35,7 @@ modifique el cliente.
 
 | Pieza | Para qué la usamos | Por qué |
 |---|---|---|
-| **Auth** | Registro e inicio de sesión con correo | Integrado con la base: `auth.uid()` está disponible en las reglas de seguridad. Al registrarse, un trigger crea el perfil y valida la **cédula** (dígito verificador). |
+| **Auth** | Registro e inicio de sesión con correo | Integrado con la base: `auth.uid()` está disponible en las reglas de seguridad. Al registrarse, un trigger crea el perfil y valida la **cédula** (dígito verificador). Los correos de confirmación y recuperación salen por **Brevo** (SMTP). |
 | **PostgreSQL** | Todos los datos | Relacional: solicitudes, cotizaciones, chats y reseñas están muy conectados entre sí. |
 | **RLS (Row Level Security)** | Que cada usuario vea y toque solo lo suyo | La seguridad la hace la base. Aunque alguien llame a la API a mano, no puede leer el chat de otro. |
 | **Triggers** | Reglas de negocio: estados de la solicitud, puntos, niveles, sanciones, notificaciones | Son automáticos y auditables. No dependen de que la app los llame, y no se pueden saltar. |
@@ -43,7 +44,7 @@ modifique el cliente.
 | **btree_gist** | Que un técnico no tenga dos visitas a la misma hora | Restricción de exclusión: la base **rechaza** el choque aunque dos clientes acepten a la vez. |
 | **Realtime** | Chat, contador de no leídas y cambios de estado en vivo | La pantalla se actualiza sola sin recargar. |
 | **Storage** | Fotos de perfil (público), cédulas y documentos (privado), evidencias | Los buckets privados protegen los datos biométricos (LOPDP). Las políticas obligan a que cada uno suba solo a su carpeta. |
-| **Edge Functions (Deno)** | Validar la selfie, validar la identidad con la cédula, verificar el rostro al iniciar sesión y al postular, enviar push | Código de servidor con claves secretas (Gemini y Firebase) que **no pueden** ir en la app. |
+| **Edge Functions (Deno)** | Validar la selfie, validar la identidad con la cédula, verificar el rostro al iniciar sesión y al postular, enviar push, barrio de un punto (`sector`), presencia en línea y anuncios | Código de servidor con claves secretas (Gemini, AWS, Firebase y Redis) que **no pueden** ir en la app. |
 | **pg_cron** | Tareas nocturnas: expirar solicitudes, reputación reciente, fin de sanciones | Reglas que dependen del **tiempo**: deben ocurrir aunque nadie use la app. |
 | **pg_net + Vault** | La base avisa a la Edge Function de push | `pg_net` hace la llamada HTTP sin bloquear el guardado; **Vault** guarda el secreto del webhook cifrado, fuera del código. |
 
@@ -53,10 +54,14 @@ modifique el cliente.
 
 | Servicio | Para qué | Por qué |
 |---|---|---|
-| **Google Gemini** | Revisar que la selfie tenga un rostro y leer los datos impresos en la cédula | Servicio gestionado, sin entrenar ni hospedar un modelo propio. El resultado **no es la decisión final**: si hay duda, revisa el admin. La foto de la cédula ecuatoriana es pequeña y de baja calidad. |
-| **AWS Rekognition** | Comparar rostros: selfie contra cédula, al iniciar sesión y al postular | `CompareFaces` devuelve un puntaje de similitud; el umbral lo aplicamos nosotros y lo dudoso va al admin. El usuario IAM solo puede usar `CompareFaces`. |
+| **Google Gemini** | Revisar que la selfie tenga un rostro claro y leer los datos impresos en la cédula | Servicio gestionado, sin entrenar ni hospedar un modelo propio. Si algo no se lee con claridad (la foto de la cédula ecuatoriana es pequeña y de baja calidad), se le pide al usuario repetir esa foto; si el servicio falla, se reintenta. No hay revisión manual. |
+| **AWS Rekognition** | Comparar rostros: selfie contra cédula, al iniciar sesión y al postular | `CompareFaces` devuelve un puntaje de similitud; el umbral lo aplicamos nosotros (85 y 60 para la cédula, 90 para sesión y postulación) y una similitud intermedia pide repetir la foto. El usuario IAM solo puede usar `CompareFaces`. |
 | **Firebase Cloud Messaging** | Notificaciones push en Android y web | Es el canal estándar para notificaciones con la app cerrada. Lo usamos **solo** para eso. |
-| **OpenStreetMap** | Teselas del mapa | Gratis y abierto. |
+| **OpenStreetMap** | Teselas del mapa y barrio de cada punto (Nominatim) | Gratis y abierto. Nominatim permite 1 consulta por segundo para toda la app: la función `sector` respeta ese límite y guarda el resultado 30 días. |
+| **Upstash Redis** | Caché (barrios, anuncios, veredictos de selfie), presencia "En línea" y límites de uso de las funciones | Contadores con caducidad y estado que el servidor puede leer. Se usa por HTTP porque las Edge Functions no mantienen conexiones. Es *fail-open*: si falla, todo sigue funcionando sin él. |
+| **Brevo** | SMTP de Supabase Auth: confirmación de cuenta y recuperación de contraseña | El SMTP por defecto de Supabase tiene un límite muy bajo de correos por hora; con Brevo los correos llegan sin ese tope. Se configura en el panel de Supabase, no en el código. |
+| **Firebase Hosting** | Publicar la app web (`chauchaapp1.web.app`) | Gratis y en la raíz del dominio: el *service worker* de las notificaciones y los enlaces de confirmación de correo funcionan sin subrutas. Lo usa el despliegue continuo. |
+| **GitHub Actions** | CI/CD | Pruebas en cada PR; al fusionar en `master` publica la web y las Edge Functions. Las migraciones se aplican a mano. |
 
 ---
 
@@ -92,17 +97,34 @@ nuevo, el push funciona sin tocar nada más.
   Flutter, bastaría con llamar a la API directo para saltársela. Por eso los
   estados, los puntos, las sanciones y los choques de horario se validan en
   PostgreSQL.
-- **Verificar la identidad una vez, no en cada postulación.** Pedir una selfie
-  en cada postulación cansa al usuario y, sin una prueba de vida real, no
-  demuestra nada. Se verifica al registrarse; la revisión manual del admin
-  queda como respaldo.
+- **Identidad verificada de forma 100 % automática.** La cédula se coteja una
+  vez con la selfie y los datos registrados (Rekognition y Gemini). Lo dudoso
+  no espera a una persona: se pide repetir la foto concreta. El admin no
+  revisa identidades; atiende reclamos y certificados.
+- **El rostro se confirma al iniciar sesión y en cada postulación.** La foto se
+  toma sola con la cámara frontal y se compara con la foto de perfil. No se usa
+  la huella ni el desbloqueo del celular: muchos técnicos tienen las huellas
+  gastadas por el trabajo, y así se verifica a la persona y no al teléfono.
+- **Una sola ubicación en toda la app.** La que el usuario guarda en su perfil
+  (ubicación actual o elegida en el mapa) es la base del inicio, de los
+  técnicos cercanos y de las solicitudes nuevas. El GPS solo se usa si no hay
+  una guardada. Así no hay que marcarla cada vez.
+- **Pasarela de pago simulada.** Es una demostración que no cobra: la tarjeta
+  se valida en el teléfono y al servidor solo llegan la marca y los últimos 4
+  dígitos. Nunca se guarda el número completo ni el CVV. El cobro real
+  necesitará Google Play Billing en Android y una pasarela local en la web.
+- **Despliegue continuo con un solo paso manual.** Fusionar el PR es la
+  revisión antes de publicar; desde ahí, las pruebas y los despliegues son
+  automáticos. Las migraciones de la base se aplican a mano porque un error
+  ahí no se deshace con un nuevo despliegue.
 - **Calificación de 1 a 5 normalizada a 3 niveles** (excelente, neutro, malo).
   El usuario ve estrellas, pero los puntos y las sanciones usan los 3 niveles:
   la regla es simple y difícil de manipular.
 - **Sanciones: 3 malas en 30 días suspenden 7 días.** Una sola mala reseña no
   hunde a nadie. Las malas que ya causaron una sanción no se vuelven a contar.
-- **Secretos fuera del repo.** Las claves de Firebase de servidor y de Gemini
-  están en los secretos de Supabase; el secreto del webhook está en Vault. En
+- **Secretos fuera del repo.** Las claves de Firebase de servidor, Gemini, AWS
+  y Redis están en los secretos de Supabase; el secreto del webhook está en
+  Vault; las credenciales de despliegue, en los secretos de GitHub. En
   `env.json` (ignorado por git) solo van claves públicas.
 - **Procesamiento de imágenes en paralelo (multihilo).** Detectar fotos
   borrosas y preparar cada foto antes de subirla (enderezarla, reducirla a
