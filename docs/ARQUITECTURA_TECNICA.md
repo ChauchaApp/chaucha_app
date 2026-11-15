@@ -6,7 +6,7 @@ Guía práctica de **cómo está implementada** cada tecnología en ChauchaApp. 
 - **Backend:** Supabase, proyecto `jfydcvrlfmnlbleecgqr`. Las migraciones están en `supabase/migrations/` y las Edge Functions en `supabase/functions/`.
 - **Rutas:** las de este documento son relativas a la raíz del repositorio.
 
-> **Estado de las integraciones (revisado el 14/11/2026)**
+> **Estado de las integraciones (revisado el 15/11/2026)**
 >
 > | Integración | Estado |
 > |---|---|
@@ -14,10 +14,11 @@ Guía práctica de **cómo está implementada** cada tecnología en ChauchaApp. 
 > | Google Gemini (visión) | En uso desde dos Edge Functions: valida la selfie y lee la cédula |
 > | AWS Rekognition (`CompareFaces`) | En uso desde tres Edge Functions: compara el rostro con la cédula, al iniciar sesión y al postular |
 > | Firebase Cloud Messaging | En uso. Es opcional en la app: sin las claves en `env.json`, la app funciona sin push |
-> | OpenStreetMap: teselas y Nominatim | En uso desde el cliente |
+> | OpenStreetMap: teselas y Nominatim | Teselas desde el cliente; Nominatim desde la función `sector` (con respaldo directo desde el cliente) |
 > | Upstash Redis | **Implementado** en las Edge Functions: caché, presencia y límites de uso (sección 11). Funciona en modo *fail-open*: mientras no se carguen los secretos `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN`, todo sigue funcionando sin Redis |
-> | Groq Vision, Brevo | **No existen en el código** (ni en Flutter, ni en las funciones, ni en las migraciones) |
-> | Correo | Solo el de Supabase Auth: confirmación de cuenta y recuperación de contraseña |
+> | Brevo (SMTP) | En uso como servidor SMTP de **Supabase Auth**: confirmación de cuenta y recuperación de contraseña. Se configura en el panel de Supabase, no en el código |
+> | Firebase Hosting + GitHub Actions | En uso: CI en cada PR y despliegue continuo de la web y las Edge Functions al fusionar en `master` (sección 9.1) |
+> | Pasarela de pago | **Simulada** (demostración, no cobra): ver la sección 8.15 |
 >
 > Las ocho Edge Functions (`validar-foto-rostro`, `comparar-rostro-cedula`, `verificar-rostro-sesion`, `verificar-rostro-postulacion`, `enviar-push`, `sector`, `anuncios` y `presencia`) tienen su código en `supabase/functions/` y están desplegadas.
 
@@ -41,8 +42,8 @@ Lo que necesita claves secretas (Gemini y la cuenta de servicio de Firebase) cor
 | **PostGIS** | Columnas `geography` (`usuarios.ubicacion_registro`, `perfiles_tecnicos.ubicacion_actual`, `solicitudes_servicio.ubicacion`) y funciones con `ST_DWithin` y `ST_Distance`. |
 | **Realtime** | Publicación `supabase_realtime` con `mensajes`, `notificaciones`, `cotizaciones`, `solicitudes_servicio`, `reclamos` y `reclamo_mensajes`. |
 | **Storage** | Buckets `perfiles`, `cedulas`, `evidencias`, `solicitudes`, `certificados`, `reclamos` y `anuncios`. Se acceden mediante `lib/core/storage/storage_service.dart` (subida y URL firmada o pública). |
-| **Edge Functions** | `validar-foto-rostro` y `comparar-rostro-cedula`, que la app invoca con `functions.invoke`, y `enviar-push`, que llama la base con `pg_net`. |
-| **Servicios externos** | Gemini (desde las funciones), FCM HTTP v1 (desde `enviar-push`), teselas OSM y Nominatim (desde el cliente). |
+| **Edge Functions** | `validar-foto-rostro`, `comparar-rostro-cedula`, `verificar-rostro-sesion`, `verificar-rostro-postulacion`, `sector` y `presencia`, que la app invoca con `functions.invoke`; `enviar-push` y `anuncios`, que además llama la base con `pg_net`. |
+| **Servicios externos** | Gemini y AWS Rekognition (desde las funciones), FCM HTTP v1 (desde `enviar-push`), Upstash Redis (desde las funciones), Nominatim (desde `sector`), teselas OSM (desde el cliente) y Brevo como SMTP de Supabase Auth. |
 
 ```mermaid
 flowchart LR
@@ -76,6 +77,8 @@ flowchart LR
   EF -->|service_role| PG
   EF -->|download| ST
   EF -->|generateContent| GEM["Google Gemini"]
+  EF -->|CompareFaces| REK["AWS Rekognition"]
+  AUTH -->|SMTP| BRE["Brevo"]
   PG -->|trigger trg_notificacion_push<br/>pg_net + secreto de Vault| EF
   VA -.-> PG
   EF -->|FCM HTTP v1| FCM["Firebase Cloud Messaging"]
@@ -142,6 +145,7 @@ El código compartido está en `lib/core/`:
 
 - **Paquetes:** `flutter_map` 8 con teselas de OpenStreetMap, `latlong2` y `geolocator`.
 - **Ubicación actual:** `core/geo/ubicacion_service.dart` (`GeolocatorUbicacionService.obtenerActual()`) pide permiso y aplica un timeout.
+- **Una sola ubicación en toda la app:** la que se guarda en el perfil ("Usar mi ubicación actual" o "Seleccionar en el mapa") en `usuarios.ubicacion_registro`. `ubicacionInicioProvider` (`auth/presentation/providers/inicio_provider.dart`) la lee de la sesión (`usuarioActualProvider`) y solo usa el GPS si no hay una guardada; si cambia en el perfil, se recalculan el inicio, los técnicos cercanos y la barra con el barrio. `CrearSolicitudView` arranca con el mapa marcado en esa ubicación. Cuando el técnico cambia su zona de trabajo, `SupabasePerfilRepository.guardar` también actualiza `ubicacion_registro` y `GuardarPerfilNotifier` recarga la sesión.
 - **Conversión con PostGIS:** `core/geo/geo_mapper.dart` convierte entre `LatLng` y PostGIS. `GeoMapper.toPostGisPoint` escribe `SRID=4326;POINT(lng lat)` y `GeoMapper.fromDb` lee GeoJSON o EWKB.
 - **Barrio por geocodificación inversa:** `core/geo/sector_service.dart` consulta Nominatim (`nominatim.openstreetmap.org/reverse`). El resultado se guarda en `sectorProvider` (`core/widgets/etiqueta_sector.dart`), que espera 350 ms antes de consultar para no llamar a la red con cada toque.
 - **Widgets de mapa:**
@@ -161,8 +165,9 @@ El código compartido está en `lib/core/`:
 | `usuarios` | `id` (= `auth.users.id`), `rol`, `nombres`, `apellidos`, `ciudad`, `foto_perfil_ruta`, `foto_rostro_validada`, `foto_rostro_motivo`, `verificado`, `verificado_manual`, `ubicacion_registro geography`, `es_vip`, `suspendido_desde`, `suspendido_hasta`, `creado_en` |
 | `identidades` | `usuario_id`, `cedula`, `codigo_dactilar` (se crea con `completar_perfil`, que valida con `validar_cedula`) |
 | `perfiles_tecnicos` | `usuario_id`, `nivel_id → niveles_gamificacion`, `tarifa_base`, `rango_cobertura_m`, `rango_bonus_m`, `ubicacion_actual geography`, `puntos`, `calificacion_promedio`, `total_resenas`, `verificado` |
-| `tecnico_oficios` | `tecnico_id`, `oficio_id` |
-| `solicitudes_servicio` | `cliente_id`, `oficio_id`, `descripcion`, `ubicacion geography`, `direccion_referencia`, `estado` (`abierta → cotizada → aceptada → por_confirmar → completada`, o `cancelada`), `creado_en`, `completada_en` |
+| `oficios` | `nombre`, `categoria` (`hogar` o `vehiculos`: mecánica automotriz, de motos, electricidad automotriz y llantería) |
+| `tecnico_oficios` | `tecnico_id`, `oficio_id`, `tarifa_visita` (precio de la visita por oficio; sin uno propio se usa `tarifa_base`, función `tarifa_visita`) |
+| `solicitudes_servicio` | `cliente_id`, `oficio_id`, `descripcion`, `ubicacion geography`, `direccion_referencia`, `estado` (`abierta → cotizada → aceptada → por_confirmar → completada`, o `cancelada`), `creado_en`, `completada_en`, `vehiculo jsonb` (tipo, marca, modelo y año, opcional en los oficios de vehículos) |
 | `cotizaciones` | `solicitud_id`, `tecnico_id`, `precio_base` (precio de la visita), `detalle`, `mano_obra`, `materiales`, `total`, `tarifa_enviada`, `fecha_servicio`, `inicio_visita`, `fin_visita`, `reagenda_inicio`, `reagenda_por`, `estado` (`pendiente`, `aceptada`, `rechazada`) |
 | `resenas` | `solicitud_id`, `autor_id`, `destinatario_id`, `calificacion` (1 a 5), `valoracion` (`excelente`, `neutro`, `malo`, normalizada por `fn_resena_normalizar`), `comentario`, `etiquetas text[]` |
 | `historial_puntos` | `tecnico_id`, `solicitud_id`, `puntos`, `motivo`. Es solo de inserción: el total se sincroniza con `fn_sync_puntos` |
@@ -172,6 +177,7 @@ El código compartido está en `lib/core/`:
 | `eventos` | Bitácora de dominio (`solicitud_creada`, `negocio_cerrado`, `solicitudes_expiradas`, `reputacion_recalculada`) |
 | `reclamos`, `reclamo_mensajes` | Tickets de garantía de 30 días (`20261113010000_reclamos_garantia.sql`) |
 | `documentos_tecnico`, `comparaciones_rostro`, `dispositivos_push`, `anuncios` | Verificación, auditoría biométrica, tokens FCM y publicidad |
+| `pagos` | Pasarela simulada: `referencia` (`PAY-000123`), `monto`, `marca`, `ultimos4`, `estado` (`aprobado` o `rechazado`), `motivo`. Nunca guarda el número completo ni el CVV |
 
 **Repositorio frente a base real:** el esquema base está en `20261107204355_remote_schema.sql` y `20261110045433_remote_schema.sql` (volcados del remoto), y los cambios posteriores en migraciones fechadas. Algunas funciones que hoy existen en la base, como `iniciar_conversacion`, no aparecen en esos archivos. Para tener el estado completo, regenerar el volcado con `supabase db pull`.
 
@@ -185,7 +191,7 @@ El código compartido está en `lib/core/`:
 | Función | Consulta |
 |---|---|
 | `solicitudes_en_mapa()` (usada por la app) | Solicitudes `abierta` de los oficios de `auth.uid()`, con el técnico `verificado` y `st_dwithin(s.ubicacion, p.ubicacion_actual, <radio efectivo>)`. Devuelve distancia, latitud y longitud. Se llama en `solicitudes/data/repositories/supabase_mapa_tecnico_repository.dart` |
-| `tecnicos_cercanos(p_lat, p_lng, p_oficio_id, p_radio_m, p_limite)` (usada por la app) | Técnicos `verificado` a `p_radio_m` de un punto, ordenados por `niveles_gamificacion.prioridad`, calificación y distancia. La posición se devuelve con `st_snaptogrid` para no exponerla. Se llama en `auth/data/repositories/supabase_inicio_repository.dart` |
+| `tecnicos_cercanos(p_lat, p_lng, p_oficio_id, p_radio_m, p_limite)` (usada por la app) | Técnicos `verificado` a `p_radio_m` de un punto, ordenados por prioridad, `niveles_gamificacion.prioridad`, calificación y distancia. Devuelve el precio de la visita del oficio buscado (`tarifa_visita`). La posición se devuelve con `st_snaptogrid` para no exponerla. Se llama en `auth/data/repositories/supabase_inicio_repository.dart` |
 | `solicitudes_cercanas(p_tecnico)` | Igual que el mapa, pero por id de técnico. **Existe en la base, pero la app no la llama** |
 | `tecnicos_elegibles(p_solicitud)` | Técnicos del oficio que cubren la ubicación de una solicitud, por prioridad de nivel y distancia. **Existe en la base, pero la app no la llama** |
 
@@ -216,6 +222,8 @@ EXCLUDE USING gist (tecnico_id WITH =, tstzrange(inicio_visita, fin_visita) WITH
 | `historial_puntos` | `trg_historial_puntos_sync` (`fn_sync_puntos`) | Actualiza `perfiles_tecnicos.puntos` y el `nivel_id` según `puntos_minimos` |
 | `mensajes` | `trg_mensaje_notificar` (`fn_notificar_mensaje`) | Crea la notificación `mensaje` para el otro participante |
 | `notificaciones` | `trg_notificacion_push` (`fn_notificacion_push`) | Webhook a `enviar-push` (ver la sección 7) |
+| `reclamos` | `trg_aviso_admin_reclamo` (`fn_aviso_admin_reclamo`) | Avisa a los admins de cada reclamo nuevo ("Nuevo reclamo REC-0008: …") |
+| `reclamo_mensajes` | `trg_aviso_admin_respuesta` (`fn_aviso_admin_respuesta`) | Avisa al asesor asignado (o a todos los admins si nadie lo tomó) cuando el usuario responde |
 | `usuarios` | `trg_usuario_proteger` (`fn_proteger_usuario`) | Si quien actualiza no es admin, impide cambiar `rol`, `verificado`, `verificado_manual`, la suspensión y poner `foto_rostro_validada = true` |
 | `usuarios` | `trg_usuario_foto`, `trg_usuario_foto_inmutable`, `trg_usuario_foto_reinicio`, `trg_usuario_foto_verificar` | Validan la ruta de la foto, la congelan una vez validada, reinician la validación si cambia y recalculan `verificado` |
 | `perfiles_tecnicos` | `trg_perfil_tecnico_proteger` (`fn_proteger_perfil_tecnico`) | El técnico no puede tocar `verificado`, `puntos`, `nivel_id`, `calificacion_promedio` ni `total_resenas` |
@@ -293,7 +301,7 @@ Realtime respeta la RLS: cada suscriptor solo recibe las filas que podría leer.
 | Función | `verify_jwt` | Fuente | Qué hace |
 |---|---|---|---|
 | `validar-foto-rostro` | Sí | `supabase/functions/validar-foto-rostro/index.ts` | Límite de 5 en 10 min y 20 por día por usuario, y caché del veredicto por SHA-256 de la imagen (sección 11). Lee `usuarios.foto_perfil_ruta`, descarga la imagen del bucket `perfiles` con `service_role` y la manda a Gemini (`generateContent` con `systemInstruction`, `temperature: 0`, respuesta JSON). Gemini aplica 7 reglas: una persona real, de frente, ojos abiertos, sin lentes, sin gorra, sin mascarilla, nítida. Prueba los modelos en orden (`MODELO_VISION_GEMINI` y los de respaldo) y reintenta ante 429 y 5xx. Guarda `foto_rostro_validada` y `foto_rostro_motivo` solo si la ruta no cambió (`.eq('foto_perfil_ruta', ruta)`). La invoca `supabase_usuario_repository.dart` |
-| `comparar-rostro-cedula` | Sí | `supabase/functions/comparar-rostro-cedula/index.ts` | Validación automática de identidad. Con el frente, el reverso y la selfie enviados: compara el rostro de la selfie con el de la cédula (Rekognition, umbrales 85 y 60) y lee la cédula con Gemini (número, apellidos y nombres, código dactilar). Coteja exacto con lo registrado (`_shared/identidad.ts`) y decide: aprueba los tres documentos, rechaza el lado a repetir con su motivo (`documentos_tecnico.observacion`), pide corregir los datos (`corregir_datos_identidad`) o deja el caso al admin. Guarda solo el resultado del cotejo en `comparaciones_rostro` y avisa con una notificación `verificacion`. Límite de 6 por hora |
+| `comparar-rostro-cedula` | Sí | `supabase/functions/comparar-rostro-cedula/index.ts` | Validación automática de identidad. Con el frente, el reverso y la selfie enviados: compara el rostro de la selfie con el de la cédula (Rekognition, umbrales 85 y 60) y lee la cédula con Gemini (número, apellidos y nombres, código dactilar). Coteja exacto con lo registrado (`_shared/identidad.ts`, `decidir`) y decide: aprueba los tres documentos, rechaza el lado a repetir con su motivo (`documentos_tecnico.observacion`) o pide corregir los datos (`corregir_datos_identidad`). **Nunca queda en revisión manual:** una similitud facial intermedia, o un nombre o código dactilar ilegibles, piden repetir la foto de ese lado; si falla Gemini o Rekognition responde 503 ("inténtalo de nuevo") sin rechazar nada. Guarda solo el resultado del cotejo en `comparaciones_rostro` y avisa con una notificación `verificacion`. Límite de 6 por hora |
 | `verificar-rostro-sesion` | Sí | `supabase/functions/verificar-rostro-sesion/index.ts` | Selfie en vivo al iniciar sesión contra la foto de perfil (Rekognition, umbral 90). Solo para cuentas verificadas; 3 intentos por sesión (`verificaciones_rostro_sesion`) |
 | `verificar-rostro-postulacion` | Sí | `supabase/functions/verificar-rostro-postulacion/index.ts` | Confirmación de identidad al postular: foto con captura automática contra la foto de perfil (Rekognition, umbral 90). Si coincide, registra la confirmación en `verificaciones_postulacion` |
 | `enviar-push` | No (la protege un secreto propio) | `supabase/functions/enviar-push/index.ts` | Ver la sección 7. No manda el push de un mensaje si el destinatario tiene ese chat abierto (presencia en Redis) |
@@ -305,7 +313,7 @@ Realtime respeta la RLS: cada suscriptor solo recibe las filas que podría leer.
 
 - El resultado de la IA **no decide por sí solo**:
   - `foto_rostro_validada` solo puede ponerlo en `true` el sistema; `fn_proteger_usuario` lo bloquea para los usuarios.
-  - `fn_verificar_por_foto` llama a `recalcular_verificacion`, que combina la cédula, la foto y la revisión del admin (`verificado_manual`).
+  - `fn_verificar_por_foto` llama a `recalcular_verificacion`, que combina los tres documentos aprobados y la foto validada. `verificado_manual` queda solo para las cuentas de demostración de la semilla: el admin ya no verifica identidades.
 - **Primer filtro en el cliente:** antes de subir, `lib/core/hilos/tareas.dart` (`esNitida`) calcula la varianza del Laplaciano sobre la imagen reducida a 400 px de ancho y rechaza las fotos con varianza menor a 100. Corre en otro hilo (sección 8.14). `core/media/selfie_camara.dart` toma la selfie con la cámara en vivo.
 - **Evidencias de cierre:** **no pasan por IA**. `marcarTerminada` (`supabase_solicitud_repository.dart`) sube las fotos al bucket `solicitudes` con la ruta `<solicitud_id>/evidencia_…jpg`, las registra en `solicitud_archivos` (`trg_archivos_limite` limita la cantidad) y cambia el estado a `por_confirmar`. El cierre lo confirma el cliente.
 - **Secretos de las funciones:** `GEMINI_API_KEY`, `MODELO_VISION_GEMINI` (opcional), `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` (Rekognition, con un usuario IAM que solo puede `CompareFaces`), `SUPABASE_SERVICE_ROLE_KEY`, `FIREBASE_SERVICE_ACCOUNT` y `APP_URL`. Ninguno está en la app.
@@ -316,7 +324,7 @@ Realtime respeta la RLS: cada suscriptor solo recibe las filas que podría leer.
 
 ### 7.1 Push con FCM (implementado)
 
-1. **Origen único.** Todo evento termina en un `INSERT` en `notificaciones`. Lo hacen los triggers (`fn_nueva_cotizacion`, `fn_cotizacion_aceptada`, `fn_notificar_mensaje`, `fn_cierre_negocio`, `fn_resena_puntos`) y los jobs (`expirar_solicitudes_viejas`, `avisar_fin_sanciones`).
+1. **Origen único.** Todo evento termina en un `INSERT` en `notificaciones`. Lo hacen los triggers (`fn_nueva_cotizacion`, `fn_cotizacion_aceptada`, `fn_notificar_mensaje`, `fn_cierre_negocio`, `fn_resena_puntos`, `fn_aviso_admin_reclamo`, `fn_aviso_admin_respuesta`), las RPC (`crear_reclamo`, `admin_gestionar_reclamo`), la función `comparar-rostro-cedula` y los jobs (`expirar_solicitudes_viejas`, `avisar_fin_sanciones`).
 2. **Webhook.** `trg_notificacion_push` ejecuta `fn_notificacion_push()`. La función lee `push_url` y `push_secreto` de **Vault**; si faltan, no hace nada. Luego llama `net.http_post` de `pg_net`, que es asíncrono y no bloquea el INSERT, con el header `x-push-secreto`. Migraciones: `20261112153959_notificaciones_push.sql` y `20261112154019_push_secreto_en_vault.sql`.
 3. **Edge Function `enviar-push`.**
    - Valida el secreto con la RPC `push_secreto_valido`.
@@ -331,8 +339,8 @@ Realtime respeta la RLS: cada suscriptor solo recibe las filas que podría leer.
 
 ### 7.2 Correo
 
-- **Lo que existe:** el correo de **Supabase Auth**: confirmación de registro (`signUp`, y `resend` para reenviarlo) y recuperación de contraseña (`resetPasswordForEmail`), en `supabase_auth_repository.dart`. Usa las plantillas y el SMTP configurados en el panel de Supabase.
-- **Lo que no existe:** correo transaccional por cambios de estado (Brevo u otro proveedor). Los avisos de estado llegan solo por push y por la campana de la app.
+- **Lo que existe:** el correo de **Supabase Auth**: confirmación de registro (`signUp`, y `resend` para reenviarlo) y recuperación de contraseña (`resetPasswordForEmail`), en `supabase_auth_repository.dart`. Usa las plantillas de Supabase y **Brevo como servidor SMTP** (configurado en Authentication → SMTP del panel; las credenciales no están en el repositorio). Los enlaces vuelven a la web (`https://chauchaapp1.web.app`) o a la app con `com.eagledev.tecnicosapp://login-callback`, que deben estar en las Redirect URLs de Supabase.
+- **Lo que no existe:** correo por cambios de estado de una solicitud. Esos avisos llegan por push y por la campana de la app.
 - **Contacto con soporte:** la app abre el cliente de correo del usuario con `mailto:` (`core/widgets/dialogos_info.dart`, `InfoApp.correoSoporte`).
 
 
@@ -340,7 +348,7 @@ Realtime respeta la RLS: cada suscriptor solo recibe las filas que podría leer.
 
 ## 8. Módulos de negocio implementados
 
-Esta sección reúne las funcionalidades de la app (cliente, técnico y admin) y dónde vive cada una. Todas están en la rama `rediseno-chauchaapp`.
+Esta sección reúne las funcionalidades de la app (cliente, técnico y admin) y dónde vive cada una. Todas están en `master`.
 
 ### 8.1 Flujo del servicio y ticket de visita
 
@@ -357,6 +365,10 @@ Esta sección reúne las funcionalidades de la app (cliente, técnico y admin) y
    - El técnico marca el trabajo como terminado, con evidencias, y la solicitud pasa a `por_confirmar`.
    - El cliente confirma (`completada`) y salen las reseñas.
    - La garantía de 30 días corre desde `completada_en`.
+
+**Oficios de vehículos y precio por oficio:** además de los oficios de hogar, hay oficios de vehículos (`oficios.categoria = 'vehiculos'`). En esas solicitudes el cliente puede indicar tipo, marca, modelo y año (`solicitudes_servicio.vehiculo`, entidad `Vehiculo`). Cada técnico pone un precio de visita por oficio (`tecnico_oficios.tarifa_visita`) y `fn_validar_cotizacion` toma el del oficio de la solicitud.
+
+**Ubicación de la solicitud:** el formulario arranca marcado en la ubicación guardada en el perfil (sección 2.3) y avisa "Usamos la ubicación de tu perfil"; tocar el mapa la cambia solo para esa solicitud.
 
 **Estado actual del modelo:** el cobro dentro de la plataforma es **solo el de la visita**. `materiales` sigue en la tabla porque la columna generada `total` depende de ella; la interfaz ya no la pide.
 
@@ -394,8 +406,9 @@ Esta sección reúne las funcionalidades de la app (cliente, técnico y admin) y
 3. **Validación automática:** al completar los documentos, `comparar-rostro-cedula` corre en segundo plano (el panel se cierra solo) y el resultado llega como notificación:
    - **Aprobada:** los documentos se aprueban, `recalcular_verificacion` marca `verificado` y la app muestra una celebración una sola vez por cuenta (`usuarios.verificacion_vista`, `marcar_verificacion_vista`) y la insignia "Verificado" (`core/widgets/insignia_verificado.dart`).
    - **Datos que no coinciden:** se abre sola la corrección (`corregir_datos_dialog.dart`, RPC `corregir_datos_identidad`) indicando qué campo falla, y se vuelve a validar.
-   - **Rechazada:** el lado a repetir queda `rechazada` con su motivo.
-   - **En revisión:** el admin decide en `admin_verificaciones_view.dart`.
+   - **Rechazada:** el lado a repetir queda `rechazada` con su motivo. Incluye los casos dudosos (similitud intermedia, nombre o código dactilar ilegibles): se pide repetir esa foto.
+   - **Falla del servicio:** si Gemini o Rekognition no responden, no se decide nada y se pide reintentar en unos minutos.
+   - **No hay revisión manual:** la verificación es 100 % automática y el admin no interviene.
 4. **Rostro al iniciar sesión:** con la cuenta verificada, cada login pide una selfie en vivo (`verificar-rostro-sesion`); el guard de rutas no deja pasar sin ella.
 5. **Al postular:** cada oferta del técnico exige confirmar su identidad (`auth/presentation/widgets/confirmar_identidad.dart`): la cámara frontal se abre y, tras una cuenta regresiva, toma la foto sola (`SelfieCamara(automatica: true)`); `verificar-rostro-postulacion` la compara con la foto de perfil. No se usa la huella ni el desbloqueo del celular: muchos técnicos tienen las huellas gastadas por el trabajo y no todos activan el desbloqueo facial; además, así se verifica a la persona y no al teléfono. El trigger `trg_cotizacion_verificacion` exige una confirmación de los últimos 10 minutos y cada una sirve para una sola oferta.
 6. **Clientes:** `20261110145228_verificacion_clientes.sql`. Mientras falta, la app muestra el aviso `AvisoVerificacionCliente`.
@@ -411,12 +424,13 @@ Esta sección reúne las funcionalidades de la app (cliente, técnico y admin) y
   - `admin_gestionar_reclamo(p_reclamo_id, p_estado, p_mensaje)`.
 - **Flutter:**
   - `reclamos/presentation/`: `TarjetaGarantia` (días restantes con `Garantia.diasRestantes`), `reportarProblema` (formulario con fotos), `MisReclamosView`, `ReclamoDetalleView` con el hilo en vivo y `EntradaMisReclamos`.
-  - El admin usa `admin_reclamos_view.dart`.
+  - El admin usa `admin_reclamos_view.dart` y recibe un aviso por cada reclamo nuevo y cada respuesta del usuario (sección 3.3).
 
 ### 8.6 Certificaciones del técnico
 
 - **Base:** tabla `certificaciones_tecnico` (`nombre`, `entidad`, `anio`, `ruta_archivo`, `estado` pendiente, aprobada o rechazada) y bucket privado `certificados`. Migraciones `20261112_certificaciones.sql` y `20261112_bucket_certificados.sql`.
 - **Flutter:** `perfil_puntos/presentation/providers/certificaciones_provider.dart` (`certificacionesAprobadasProvider` para el perfil público) y `widgets/certificaciones_widgets.dart`.
+- **Revisión:** es lo único del técnico que revisa una persona. El admin aprueba o rechaza en `admin/presentation/views/admin_certificados_view.dart` (pestaña "Certificados", con contador `certificadosPendientesConteoProvider`).
 - **Pendiente:** los **+50 puntos** por certificación aprobada **no están implementados**. Ningún trigger sobre `certificaciones_tecnico` escribe en `historial_puntos`.
 
 ### 8.7 Publicidad (modelo de ingreso)
@@ -442,12 +456,13 @@ Esta sección reúne las funcionalidades de la app (cliente, técnico y admin) y
   - Solicitudes activas (`solicitudesActivasProvider`: una consulta de ofertas con `deSolicitudes`).
   - Reseñas recibidas.
   - Historial de servicios: `historialServicios(clienteId, limite)` en `SupabaseSolicitudRepository`. Es **una sola consulta** con joins embebidos: `cotizaciones!fk_cotizaciones_solicitud!inner(...)` filtrado por `cotizaciones.estado = aceptada`, `perfiles_tecnicos`, `usuarios` y `resenas!fk_resenas_solicitud(...)` filtrado por `resenas.autor_id`.
-  - Volver a contratar (`tecnicosRecurrentes`) y ubicación (actualiza `usuarios.ubicacion_registro`).
+  - Volver a contratar (`tecnicosRecurrentes`) y ubicación (actualiza `usuarios.ubicacion_registro`, que pasa a ser la ubicación de toda la app; sección 2.3).
 - **Perfil público del técnico** (`perfil_puntos/presentation/views/perfil_tecnico_publico.dart`): nivel, métricas, oficios, certificaciones, reseñas y verificación. No muestra puntos, faltas ni datos de contacto.
 
 ### 8.10 Panel de administración
 
-- **Rol `admin`:** `InicioShell` con `admin_resumen_view.dart`, `admin_usuarios_view.dart`, `admin_verificaciones_view.dart`, `admin_solicitudes_view.dart` y `admin_reclamos_view.dart`.
+- **Rol `admin`:** `InicioShell` con las pestañas Resumen (`admin_resumen_view.dart`, con los reclamos por atender), Reclamos (`admin_reclamos_view.dart`), Certificados (`admin_certificados_view.dart`), Solicitudes (`admin_solicitudes_view.dart`) y Usuarios (`admin_usuarios_view.dart`).
+- **No verifica identidades:** la verificación es automática (sección 8.4). Su bandeja son los reclamos: le llega un aviso de cada reclamo nuevo y de cada respuesta.
 - **RPC:** todas con `exigir_admin()` (`admin_resumen`, `admin_usuarios`, `admin_actualizar_usuario`, `admin_suspender_usuario`, `admin_eliminar_usuario`). `exigir_no_admin` impide actuar sobre otro admin. Migración `20261109150000_panel_admin.sql`.
 
 ### 8.11 Auditoría y bitácora de eventos
@@ -468,6 +483,14 @@ Esta sección reúne las funcionalidades de la app (cliente, técnico y admin) y
 
 `darse_de_baja()` desactiva la cuenta (`usuarios.dado_de_baja_en`) sin borrarla, porque las reseñas y el historial de otros apuntan a ella. Cancela las solicitudes activas del cliente; retira las ofertas del técnico y, si tenía visitas aceptadas, devuelve esas solicitudes a "cotizada" y avisa al cliente. La cuenta deja de estar verificada y la sesión no deja volver a entrar (`sesion_provider.dart`). Se ofrece en el perfil del cliente y en "Configuración de la cuenta" (`auth/presentation/widgets/baja_cuenta.dart`).
 
+### 8.15 Pasarela de pago simulada
+
+- **Qué es:** una pantalla de pago de demostración (`CheckoutView`, en `lib/features/planes/presentation/views/checkout_view.dart`) para pagar la suscripción del técnico. **No cobra nada.**
+- **En el teléfono:** `Tarjeta` (`domain/entities/tarjeta.dart`) valida el número con el algoritmo de Luhn, reconoce la marca (Visa, Mastercard, Amex, Diners), el vencimiento MM/AA y el CVV (4 dígitos en Amex). Muestra "Procesando pago…" y un comprobante.
+- **Al servidor solo llegan la marca y los últimos 4 dígitos:** RPC `pagar_plan(p_plan, p_marca, p_ultimos4)` (`security definer`), que registra la fila en `pagos` con su referencia `PAY-000123`. Migración `20261115140000_pagos_demo.sql`.
+- **Tarjetas de prueba:** `4242 4242 4242 4242` se aprueba; una terminada en `0002` se rechaza por "fondos insuficientes", como en Stripe. La pantalla tiene botones para cargar cada una.
+- **Siguiente paso real:** en Android, una suscripción que desbloquea funciones de la app debe cobrarse con Google Play Billing; en la web se puede usar una pasarela local (Payphone o Kushki).
+
 ### 8.14 Procesamiento multihilo
 
 `core/hilos` ejecuta con `isolate_manager` la detección de fotos borrosas y la preparación de cada foto antes de subirla (orientación, 1280 px, JPEG) en un grupo de hilos: isolates en Android y Web Workers en web. Varias fotos se preparan en paralelo y, si un hilo falla o no responde en 15 s, la tarea corre en el hilo principal. Los workers se generan con `dart run isolate_manager:generate --single` (`web/esNitida.js`, `web/prepararFoto.js`) y `tool/prueba_workers.dart` comprueba que funcionan en un navegador.
@@ -476,14 +499,26 @@ Esta sección reúne las funcionalidades de la app (cliente, técnico y admin) y
 
 ## 9. Pruebas, configuración y ejecución
 
-- **Pruebas:** 53 archivos `*_test.dart` en `test/` (widgets, modelos, providers y el guard de rutas).
+- **Pruebas:** 56 archivos `*_test.dart` en `test/` (widgets, modelos, providers, el guard de rutas, la tarjeta y la ubicación), 356 pruebas en total. Las Edge Functions tienen pruebas Deno en `supabase/functions/_shared/`.
   - Los repositorios se sustituyen con falsos (`test/features/solicitudes/falsos.dart`) o con `overrideWith` sobre los providers.
   - Para que no haya red, `supabaseClientProvider` apunta a `http://localhost` con `autoRefreshToken: false`.
   - Ejecución: `flutter test`. Análisis estático: `flutter analyze` (reglas en `analysis_options.yaml`).
 - **Configuración:** `env.json`, que no se sube al repositorio; la plantilla es `env.example.json`. Contiene `SUPABASE_URL`, `SUPABASE_ANON_KEY` y las claves `FIREBASE_*`, incluida `FIREBASE_VAPID_KEY` para web.
 - **Ejecución en web:** `flutter run -d chrome --web-port=3000 --dart-define-from-file=env.json` (ver `README.md`).
 - **Secretos del servidor:** en Supabase (Edge Functions) y en Vault (`push_url`, `push_secreto`). Nunca en la app.
-- **Datos de prueba:** `supabase/semilla/` (`generar.py`, `05_vip.sql`, `06_niveles.sql`, `99_limpiar.sql`).
+- **Datos de demostración:** `supabase/semilla/semilla_quito.sql` crea 60 técnicos y 90 clientes en todo Quito (norte, centro, sur y valles), verificados y con foto (caras generadas por IA), con solicitudes en todos los estados, chats, tickets, agenda, reseñas, reclamos, certificaciones y pagos. Pasa por las mismas RPC que la app (`iniciar_chat`, `enviar_tarifa`, `aceptar_cotizacion`, `crear_reclamo`), así respeta las reglas reales. La contraseña de las cuentas (`@semilla.chaucha.app`) se reemplaza en `__CLAVE__` al ejecutar y no va en el repositorio. El generador anterior (`generar.py`) sigue en la carpeta.
+
+### 9.1 CI/CD (GitHub Actions)
+
+| Workflow | Cuándo | Qué hace |
+|---|---|---|
+| `app.yml` | Cada PR y cada push a `master` | `flutter analyze`, `flutter test` y `flutter build web` de comprobación |
+| `edge-functions.yml` | Cambios en `supabase/functions/` | `deno check` y pruebas de `_shared`. En `master`, el job `desplegar` publica las 8 funciones en Supabase (CLI fijado en 3.1.0, `enviar-push` y `anuncios` sin JWT) |
+| `despliegue-web.yml` | Cuando `App Flutter` termina en verde sobre `master` | Compila la web con el secreto `ENV_JSON` y la publica en **Firebase Hosting** (`https://chauchaapp1.web.app`) |
+
+- **Secretos del repositorio:** `ENV_JSON`, `FIREBASE_SERVICE_ACCOUNT`, `SUPABASE_ACCESS_TOKEN` y la variable `SUPABASE_PROJECT_REF`.
+- **Fusionar el PR es el único paso manual:** desde ahí, las pruebas y los despliegues son automáticos.
+- **Migraciones:** no se aplican solas. Se revisan y se aplican a mano (SQL Editor o `supabase db push`) y se registran en `supabase_migrations.schema_migrations` con la misma versión del archivo.
 
 ---
 
@@ -493,8 +528,9 @@ Esta sección reúne las funcionalidades de la app (cliente, técnico y admin) y
 |---|---|---|
 | Publicador del outbox `eventos` hacia Redis | Planificado | Ver el detalle debajo. La caché, la presencia y los límites ya funcionan (sección 11) |
 | +50 puntos por certificación | Pendiente | Trigger `after update` en `certificaciones_tecnico` (al pasar a `aprobada`) que inserte en `historial_puntos` con motivo `certificacion` y un tope por técnico |
-| Correo transaccional (Brevo u otro) | No iniciado | Mismo enganche que el push: un trigger sobre `notificaciones`, o el consumidor de `eventos`, que llame a una Edge Function de correo |
-| Comisión sobre el precio de la visita | Definido en el esquema, sin cobro | `niveles_gamificacion.comision_porcentaje` existe, pero no hay pasarela ni cálculo de cobro |
+| Correo por cambios de estado | No iniciado | Mismo enganche que el push: un trigger sobre `notificaciones`, o el consumidor de `eventos`, que llame a una Edge Function que envíe por la API de Brevo (el mismo proveedor que ya usa Supabase Auth como SMTP) |
+| Comisión sobre el precio de la visita | Definido en el esquema, sin cobro | `niveles_gamificacion.comision_porcentaje` existe, pero no hay cálculo de cobro. La única pasarela es la simulada (sección 8.15) |
+| Pago real | Pendiente | Reemplazar la pasarela simulada: Google Play Billing en Android y una pasarela local en la web |
 | Quitar `cotizaciones.materiales` | Pendiente | Redefinir la columna generada `total` antes de borrar la columna |
 | Calificaciones ciegas | No iniciado | Ocultar las `resenas` en la política de lectura hasta que existan las dos, o pasen 7 días |
 | Endurecer la privacidad | Pendiente | `usuarios_lectura` y `perfiles_tec_lectura` (`USING true`) exponen ubicaciones. Los buckets `solicitudes` y `evidencias` dejan leer y subir a cualquier autenticado. Ver la sección 4 |
@@ -556,7 +592,9 @@ Este publicador es lo único de Redis que falta; la caché, la presencia y los l
 | Función | Regla | Motivo |
 |---|---|---|
 | `validar-foto-rostro` | 5 en 10 min y 20 por día por usuario. No cuenta si la foto ya está validada | Cada revisión es una llamada a Gemini |
-| `comparar-rostro-cedula` | 3 por hora por usuario | Una llamada a Gemini por comparación |
+| `comparar-rostro-cedula` | 6 por hora por usuario | Una llamada a Gemini y a Rekognition por comparación |
+| `verificar-rostro-sesion` | 10 por hora por usuario | Una llamada a Rekognition por intento |
+| `verificar-rostro-postulacion` | 30 por hora por usuario | Una por oferta, con reintentos |
 | `sector` | 30 por minuto por usuario y **1 por segundo global** hacia Nominatim | Política de uso de OpenStreetMap |
 | `presencia` (POST) | 6 por minuto por usuario | El latido es cada 30 s |
 
@@ -595,8 +633,8 @@ Lo que va directo a PostgREST (crear solicitudes, cotizaciones, mensajes) **no p
 
 ```bash
 supabase secrets set UPSTASH_REDIS_REST_URL=https://<base>.upstash.io UPSTASH_REDIS_REST_TOKEN=<token>
-supabase functions deploy validar-foto-rostro comparar-rostro-cedula sector presencia --use-api
+supabase functions deploy validar-foto-rostro comparar-rostro-cedula verificar-rostro-sesion verificar-rostro-postulacion sector presencia --use-api
 supabase functions deploy enviar-push anuncios --use-api --no-verify-jwt
 ```
 
-Los secretos van solo en Supabase, nunca en `env.json` ni en la app.
+Los secretos van solo en Supabase, nunca en `env.json` ni en la app. En `master`, este despliegue lo hace solo el workflow `edge-functions.yml` (sección 9.1).

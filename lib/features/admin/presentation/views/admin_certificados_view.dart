@@ -26,7 +26,7 @@ class AdminCertificadosView extends ConsumerWidget {
     final procesando = ref.watch(revisarCertificacionProvider).isLoading;
     return PantallaAdmin(
       titulo: 'Certificados',
-      subtitulo: 'Cada certificado aprobado suma 50 puntos al técnico.',
+      subtitulo: 'Aprueba o rechaza los certificados que suben los técnicos.',
       onRecargar: () => esperarSinError(
         ref.refresh(certificacionesPendientesProvider.future),
       ),
