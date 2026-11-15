@@ -54,6 +54,9 @@ class _CrearSolicitudViewState extends ConsumerState<CrearSolicitudView> {
   int? _oficioId;
   LatLng _ubicacion = GeoMapper.quito;
   bool _buscandoGps = false;
+
+  /// La ubicación vino del perfil (se avisa debajo del mapa).
+  bool _desdePerfil = false;
   List<Uint8List> _fotos = const [];
 
   /// Id de la solicitud recién publicada: con él se muestra el éxito.
@@ -64,7 +67,15 @@ class _CrearSolicitudViewState extends ConsumerState<CrearSolicitudView> {
     super.initState();
     _oficioId = widget.oficioId;
     _descripcion.text = widget.descripcion ?? '';
-    unawaited(_buscarUbicacion());
+    // Arranca en la ubicación guardada en el perfil; solo sin ella se usa
+    // el GPS.
+    final guardada = ref.read(usuarioActualProvider)?.ubicacionRegistro;
+    if (guardada != null) {
+      _ubicacion = guardada;
+      _desdePerfil = true;
+    } else {
+      unawaited(_buscarUbicacion());
+    }
     unawaited(refrescarVerificacion(ref));
   }
 
@@ -86,7 +97,10 @@ class _CrearSolicitudViewState extends ConsumerState<CrearSolicitudView> {
     if (!mounted) return false;
     setState(() {
       _buscandoGps = false;
-      if (actual != null) _ubicacion = actual;
+      if (actual != null) {
+        _ubicacion = actual;
+        _desdePerfil = false;
+      }
     });
     return actual != null;
   }
@@ -434,8 +448,21 @@ class _CrearSolicitudViewState extends ConsumerState<CrearSolicitudView> {
       children: [
         MapaUbicacion(
           punto: _ubicacion,
-          onCambio: (punto) => setState(() => _ubicacion = punto),
+          mostrarSector: true,
+          onCambio: (punto) => setState(() {
+            _ubicacion = punto;
+            _desdePerfil = false;
+          }),
         ),
+        if (_desdePerfil) ...[
+          const SizedBox(height: Espacios.s),
+          Text(
+            'Usamos la ubicación de tu perfil. Toca el mapa si el trabajo es '
+            'en otro lugar.',
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: Colores.tintaSuave),
+          ),
+        ],
         const SizedBox(height: Espacios.m),
         OutlinedButton.icon(
           onPressed: _buscandoGps ? null : _usarGps,

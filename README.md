@@ -19,12 +19,17 @@ La app es una sola base de código en **Flutter** (web y Android). El backend es
 - En **Mi perfil** ve sus solicitudes activas, el historial con la garantía de cada servicio y los técnicos con los que ya trabajó.
 
 **Técnico**
-- Verifica su identidad: cédula, código dactilar y selfie con cámara en vivo, revisada con IA y por el equipo.
+- Verifica su identidad: cédula, código dactilar y selfie con cámara en vivo. La revisión es automática (IA y comparación facial con AWS Rekognition): si algo no está claro, se le pide repetir la foto concreta, nunca queda esperando a una persona.
 - Ve en un mapa las solicitudes de sus oficios dentro de su radio de cobertura, y envía propuestas y tickets.
 - Tiene su agenda (Mes, Semana, Lista), su nivel y sus puntos (Bronce, Plata, Oro) y sus certificaciones.
+- Ofrece oficios de hogar y de vehículos, con un precio de visita por oficio.
 
 **Administración**
-- Panel con resumen, usuarios, verificaciones de identidad, solicitudes y reclamos.
+- Panel con resumen, reclamos, certificados por aprobar, solicitudes y usuarios. La identidad no pasa por el admin: se verifica sola.
+- Le llega un aviso con cada reclamo nuevo y cada vez que el usuario responde en uno.
+
+**Ubicación**
+- La ubicación que se guarda en el perfil ("Usar mi ubicación actual" o "Seleccionar en el mapa") es la de toda la app: el inicio, los técnicos cercanos y las solicitudes nuevas parten de ella. Sin una guardada, se usa el GPS.
 
 **Reglas que aplica la base de datos**
 - Reseñas en 3 niveles con puntos.
@@ -125,6 +130,8 @@ supabase db push                      # aplica supabase/migrations/
 supabase functions deploy validar-foto-rostro comparar-rostro-cedula sector presencia
 supabase functions deploy enviar-push anuncios --no-verify-jwt
 ```
+
+**Datos de demostración:** [`supabase/semilla/semilla_quito.sql`](supabase/semilla/semilla_quito.sql) crea 60 técnicos y 90 clientes repartidos por todo Quito (norte, centro, sur y valles). Todos están verificados y tienen historial: solicitudes en todos los estados, chats, tickets, agenda, reseñas, reclamos y certificaciones. Las cuentas usan el dominio `@semilla.chaucha.app`. Antes de correrlo, reemplaza `__CLAVE__` por la contraseña que tendrán las cuentas; la contraseña no va en el repositorio.
 
 ---
 

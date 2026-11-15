@@ -5,11 +5,12 @@ import 'package:go_router/go_router.dart';
 import '../core/router/app_routes.dart';
 import '../core/widgets/pantalla_secundaria.dart';
 import '../core/widgets/splash_view.dart';
+import '../features/admin/presentation/providers/certificaciones_admin_provider.dart';
+import '../features/admin/presentation/views/admin_certificados_view.dart';
 import '../features/admin/presentation/views/admin_reclamos_view.dart';
 import '../features/admin/presentation/views/admin_resumen_view.dart';
 import '../features/admin/presentation/views/admin_solicitudes_view.dart';
 import '../features/admin/presentation/views/admin_usuarios_view.dart';
-import '../features/admin/presentation/views/admin_verificaciones_view.dart';
 import '../features/auth/domain/entities/sesion_estado.dart';
 import '../features/auth/presentation/providers/sesion_provider.dart';
 import '../features/auth/presentation/views/completar_perfil_view.dart';
@@ -27,6 +28,8 @@ import '../features/legal/presentation/views/pagina_legal_view.dart';
 import '../features/perfil_puntos/presentation/views/perfil_publico_view.dart';
 import '../features/perfil_puntos/presentation/views/perfil_tecnico_view.dart';
 import '../features/perfil_puntos/presentation/widgets/disponibilidad_tecnico.dart';
+import '../features/planes/presentation/views/checkout_view.dart';
+import '../features/planes/presentation/views/planes_view.dart';
 import '../features/reclamos/presentation/providers/reclamos_provider.dart';
 import '../features/reclamos/presentation/views/mis_reclamos_view.dart';
 import '../features/reclamos/presentation/views/reclamo_detalle_view.dart';
@@ -182,6 +185,23 @@ final routerProvider = Provider<GoRouter>((ref) {
         AdminResumenView(),
         iconoActivo: Icons.space_dashboard_rounded,
       ),
+      // La identidad se verifica sola (IA y comparación facial): el admin
+      // atiende reclamos y certificados, no verificaciones.
+      Destino(
+        'Reclamos',
+        Icons.verified_user_outlined,
+        const AdminReclamosView(),
+        iconoActivo: Icons.verified_user_rounded,
+        conteo: reclamosRecibidosProvider,
+        tiposNotificacion: ['reclamo'],
+      ),
+      Destino(
+        'Certificados',
+        Icons.workspace_premium_outlined,
+        const AdminCertificadosView(),
+        iconoActivo: Icons.workspace_premium_rounded,
+        conteo: certificadosPendientesConteoProvider,
+      ),
       const Destino(
         'Solicitudes',
         Icons.assignment_outlined,
@@ -193,20 +213,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         Icons.group_outlined,
         AdminUsuariosView(),
         iconoActivo: Icons.group_rounded,
-      ),
-      const Destino(
-        'Verificaciones',
-        Icons.badge_outlined,
-        AdminVerificacionesView(),
-        iconoActivo: Icons.badge_rounded,
-        corto: 'Verificar',
-      ),
-      Destino(
-        'Reclamos',
-        Icons.verified_user_outlined,
-        const AdminReclamosView(),
-        iconoActivo: Icons.verified_user_rounded,
-        conteo: reclamosRecibidosProvider,
       ),
     ],
   );
@@ -353,6 +359,19 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: 'reclamos',
             builder: (context, state) =>
                 shellTecnico(pagina: const MisReclamosView(esCliente: false)),
+          ),
+          GoRoute(
+            path: 'planes',
+            builder: (context, state) =>
+                shellTecnico(pagina: const PlanesView()),
+            routes: [
+              GoRoute(
+                path: 'pagar/:codigo',
+                builder: (context, state) => shellTecnico(
+                  pagina: CheckoutView(codigo: state.pathParameters['codigo']!),
+                ),
+              ),
+            ],
           ),
           GoRoute(
             path: 'tecnico/:id',

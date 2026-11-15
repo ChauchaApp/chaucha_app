@@ -8,7 +8,7 @@ Future<R> supabaseGuard<R>(Future<R> Function() action) async {
   } on AuthException catch (e) {
     throw AppFailure(_mensajeAuth(e), code: e.statusCode, cause: e);
   } on PostgrestException catch (e) {
-    throw AppFailure(_mensajePostgrest(e), code: e.code, cause: e);
+    throw AppFailure(_mensajePostgrest(e), code: codigoPostgrest(e), cause: e);
   } on StorageException catch (e) {
     throw AppFailure(
       'No se pudo subir o leer el archivo. Inténtalo de nuevo.',
@@ -64,6 +64,13 @@ String _mensajeAuth(AuthException e) {
         'puede que ya esté registrada.';
   }
   return 'No se pudo completar la autenticación.';
+}
+
+/// Código del error. Los límites del plan llegan en el HINT como
+/// `plan:...` (por ejemplo `plan:limite_cotizaciones`); si no, el SQLSTATE.
+String? codigoPostgrest(PostgrestException e) {
+  final pista = e.hint;
+  return pista != null && pista.startsWith('plan:') ? pista : e.code;
 }
 
 String _mensajePostgrest(PostgrestException e) {

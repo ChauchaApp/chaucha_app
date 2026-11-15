@@ -68,13 +68,21 @@ const base: Entrada = {
 
 Deno.test('decisión', () => {
   assertEquals(decidir(base).decision, 'aprobada');
-  assertEquals(decidir({ ...base, rostro: 'medio' }).decision, 'revision');
+  // Nada queda en revisión manual: lo dudoso pide repetir la foto.
+  assertEquals(decidir({ ...base, rostro: 'medio' }).decision, 'rechazada');
+  assertEquals(decidir({ ...base, rostro: 'falla' }).decision, 'reintentar');
+  assertEquals(decidir({ ...base, nombres: 'ilegible' }), {
+    decision: 'rechazada',
+    lado: 'cedula_frontal',
+    motivo: 'No se lee bien tu nombre en la cédula. Toma de nuevo el frente, enfocado y sin reflejos.',
+  });
+  assertEquals(decidir({ ...base, dactilar: 'ilegible' }).decision, 'rechazada');
   assertEquals(decidir({ ...base, rostro: 'bajo' }).decision, 'rechazada');
   assertEquals(decidir({ ...base, esCedula: false }).decision, 'rechazada');
   assertEquals(
     decidir({ ...base, esCedula: null, cedula: 'ilegible', nombres: 'ilegible', apellidos: 'ilegible', dactilar: 'ilegible' })
       .decision,
-    'revision',
+    'reintentar',
   );
 });
 

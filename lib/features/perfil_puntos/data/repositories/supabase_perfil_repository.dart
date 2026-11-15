@@ -59,22 +59,44 @@ class SupabasePerfilRepository implements PerfilRepository {
               'ubicacion_actual': GeoMapper.toPostGisPoint(punto),
           })
           .eq('usuario_id', uid);
+      // La zona del técnico también es su ubicación en el resto de la app.
+      if (cambios.ubicacion case final punto?) {
+        await _client
+            .from('usuarios')
+            .update({'ubicacion_registro': GeoMapper.toPostGisPoint(punto)})
+            .eq('id', uid);
+      }
 
       final actuales = await _client
           .from('tecnico_oficios')
-          .select('oficio_id')
+          .select('oficio_id, activo')
           .eq('tecnico_id', uid);
       final ids = actuales.map((f) => aInt(f['oficio_id'])).toSet();
+      final pausados = {
+        for (final f in actuales)
+          if (f['activo'] == false) aInt(f['oficio_id']),
+      };
+      final activos = ids.difference(pausados);
 
-      final quitar = ids.difference(cambios.oficioIds);
+      // Los pausados que no se eligieron se quedan pausados (no se borran).
+      final quitar = activos.difference(cambios.oficioIds);
+      final reactivar = pausados.intersection(cambios.oficioIds);
       final agregar = cambios.oficioIds.difference(ids);
 
+      // Primero se quitan, para dejar lugar dentro del tope del plan.
       if (quitar.isNotEmpty) {
         await _client
             .from('tecnico_oficios')
             .delete()
             .eq('tecnico_id', uid)
             .inFilter('oficio_id', quitar.toList());
+      }
+      if (reactivar.isNotEmpty) {
+        await _client
+            .from('tecnico_oficios')
+            .update({'activo': true})
+            .eq('tecnico_id', uid)
+            .inFilter('oficio_id', reactivar.toList());
       }
       if (agregar.isNotEmpty) {
         await _client.from('tecnico_oficios').insert([

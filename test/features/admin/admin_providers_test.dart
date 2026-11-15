@@ -1,11 +1,9 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tecnicos_app/core/errors/app_failure.dart';
 import 'package:tecnicos_app/features/admin/data/repositories/supabase_admin_repository.dart';
 import 'package:tecnicos_app/features/admin/domain/entities/usuario_admin.dart';
 import 'package:tecnicos_app/features/admin/presentation/providers/admin_providers.dart';
-import 'package:tecnicos_app/features/admin/presentation/views/admin_verificaciones_view.dart';
 import 'package:tecnicos_app/features/auth/domain/entities/registro_datos.dart';
 import 'package:tecnicos_app/features/auth/domain/entities/rol.dart';
 import 'package:tecnicos_app/features/auth/domain/entities/usuario.dart';
@@ -122,41 +120,6 @@ void main() {
     test('sin documentos no hace nada', () async {
       expect(await revision().revisar([], aprobado: true), isFalse);
       expect(repo.revisados, isEmpty);
-    });
-  });
-
-  group('TarjetaRevision', () {
-    Future<void> montar(WidgetTester tester) async {
-      await tester.pumpWidget(
-        UncontrolledProviderScope(
-          container: container,
-          child: MaterialApp(
-            home: Scaffold(
-              body: SingleChildScrollView(
-                child: TarjetaRevision(revision: revisionDePrueba()),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    testWidgets('muestra el técnico, sus documentos y cuántos faltan', (
-      tester,
-    ) async {
-      await montar(tester);
-      expect(find.text('Luis Andrade'), findsOneWidget);
-      expect(find.text('2 por revisar'), findsOneWidget);
-      expect(find.text('Cédula (frente)'), findsOneWidget);
-      expect(find.text('Selfie'), findsOneWidget);
-      expect(find.text('Aprobado'), findsOneWidget);
-    });
-
-    testWidgets('"Aprobar" aprueba solo los pendientes', (tester) async {
-      await montar(tester);
-      await tester.tap(find.text('Aprobar'));
-      await tester.pump();
-      expect(repo.revisados, [('d1', true), ('d3', true)]);
     });
   });
 }

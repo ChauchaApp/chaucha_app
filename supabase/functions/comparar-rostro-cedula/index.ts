@@ -56,9 +56,8 @@ const ESQUEMA = {
   required: ['es_cedula_ecuatoriana', 'numero_cedula', 'apellidos_y_nombres', 'codigo_dactilar'],
 };
 
-const AVISOS: Record<Decision['decision'], (d: Decision) => string> = {
+const AVISOS: Record<Exclude<Decision['decision'], 'reintentar'>, (d: Decision) => string> = {
   aprobada: () => '¡Listo! Tu identidad está verificada.',
-  revision: () => 'Recibimos tus documentos. Un asesor revisará tu verificación pronto.',
   rechazada: (d) =>
     `Revisa tu verificación: ${d.decision === 'rechazada' ? d.motivo : ''}`.trim(),
   datos: () =>
@@ -116,20 +115,6 @@ Deno.serve(async (req) => {
     const frente = vigente.get('cedula_frontal')!.ruta_archivo;
     const reverso = vigente.get('cedula_posterior')!.ruta_archivo;
 
-    const { data: previa } = await admin
-      .from('comparaciones_rostro')
-      .select('decision, datos')
-      .eq('usuario_id', user.id)
-      .order('creado_en', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (
-      previa?.decision === 'revision' &&
-      previa.datos?.frente === frente &&
-      previa.datos?.reverso === reverso
-    ) {
-      return responder({ decision: 'revision' });
-    }
 
     const limite = await limitar('comparar', user.id);
     if (!limite.permitido) return respuesta429(limite.reintentarEnSeg);
@@ -182,6 +167,13 @@ Deno.serve(async (req) => {
         : 'ilegible',
     } as const;
     const resultado = decidir(cotejo);
+    // Falló la IA o la comparación de rostros: no se rechaza nada.
+    if (resultado.decision === 'reintentar') {
+      return responder(
+        { error: 'El servicio de verificación está ocupado. Inténtalo de nuevo en unos minutos.' },
+        503,
+      );
+    }
 
     const ahora = new Date().toISOString();
     if (resultado.decision === 'aprobada') {
@@ -208,11 +200,7 @@ Deno.serve(async (req) => {
       confianza: similitud === null ? null : Math.round(similitud),
       similitud,
       decision: resultado.decision,
-      motivo: resultado.decision === 'rechazada'
-        ? resultado.motivo
-        : resultado.decision === 'revision'
-        ? resultado.motivos.join(' ')
-        : null,
+      motivo: resultado.decision === 'rechazada' ? resultado.motivo : null,
       // Solo resultados del cotejo, no los datos leídos de la cédula.
       datos: {
         frente,

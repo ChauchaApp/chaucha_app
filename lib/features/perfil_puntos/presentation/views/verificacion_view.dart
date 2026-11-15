@@ -395,7 +395,7 @@ class _VerificacionPanelState extends ConsumerState<VerificacionPanel> {
             const SizedBox(width: Espacios.s),
             Expanded(
               child: Text(
-                'Solo tú y el equipo de verificación pueden ver tu cédula.',
+                'Solo tú y el sistema de verificación pueden ver tu cédula.',
                 style: textos.bodySmall?.copyWith(color: Colores.tintaSuave),
               ),
             ),
@@ -468,7 +468,7 @@ class _EnRevision extends StatelessWidget {
             Text(
               validando
                   ? 'Estamos verificando tu identidad'
-                  : 'Perfil en revisión',
+                  : 'Verificación en proceso',
               style: textos.titleLarge,
             ),
             const SizedBox(height: Espacios.xs),
@@ -476,8 +476,8 @@ class _EnRevision extends StatelessWidget {
               validando
                   ? 'Toma unos segundos. Puedes cerrar esta ventana: te '
                         'avisaremos con una notificación.'
-                  : 'Tu verificación se realizará pronto. Te avisaremos '
-                        'cuando tu cuenta quede verificada.',
+                  : 'La revisión es automática y toma unos minutos. Te '
+                        'avisaremos con una notificación.',
               textAlign: TextAlign.center,
               style: textos.bodyMedium?.copyWith(color: Colores.tintaSuave),
             ),

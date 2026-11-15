@@ -38,7 +38,17 @@ class GuardarPerfilNotifier extends AsyncNotifier<void> {
     if (!ref.mounted) return !resultado.hasError;
 
     state = resultado;
-    if (!resultado.hasError) ref.invalidate(perfilTecnicoProvider);
+    if (!resultado.hasError) {
+      ref.invalidate(perfilTecnicoProvider);
+      // Cambió la zona: la sesión trae la nueva ubicación para toda la app.
+      if (cambios.ubicacion != null) {
+        try {
+          await ref.read(sesionProvider.notifier).recargarUsuario();
+        } on Object {
+          // Secundario: lo guardado ya está; la sesión se pone al día sola.
+        }
+      }
+    }
     return !resultado.hasError;
   }
 }

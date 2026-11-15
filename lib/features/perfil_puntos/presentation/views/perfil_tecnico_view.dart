@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/pestana_solicitada.dart';
 import '../../../../app/pie_pagina.dart';
+import '../../../../core/errors/app_failure.dart';
 import '../../../../core/geo/geo_mapper.dart';
 import '../../../../core/geo/sector_service.dart';
 import '../../../../core/theme/tokens.dart';
@@ -26,6 +27,8 @@ import '../../../auth/presentation/views/perfil_cliente_view.dart';
 import '../../../catalogo/domain/entities/oficio.dart';
 import '../../../catalogo/presentation/providers/oficios_provider.dart';
 import '../../../catalogo/presentation/widgets/icono_oficio.dart';
+import '../../../planes/presentation/widgets/entrada_mi_plan.dart';
+import '../../../planes/presentation/widgets/limite_plan.dart';
 import '../../../publicidad/domain/entities/anuncio.dart';
 import '../../../publicidad/presentation/widgets/bloque_publicidad.dart';
 import '../../../reclamos/presentation/widgets/entrada_mis_reclamos.dart';
@@ -132,6 +135,18 @@ class _PerfilTecnicoViewState extends ConsumerState<PerfilTecnicoView> {
     setState(() {
       final nuevo = {..._seleccionados};
       if (!nuevo.remove(id)) {
+        final tope = _base?.oficiosMaxPlan;
+        if (tope != null && nuevo.length >= tope) {
+          ofrecerPlanSiEsLimite(
+            context,
+            AppFailure(
+              'Tu plan permite hasta $tope oficios activos. Quita uno para '
+              'elegir otro.',
+              code: 'plan:limite_oficios',
+            ),
+          );
+          return;
+        }
         nuevo.add(id);
         // Arranca con el precio que ya cobra, para no dejarlo vacío.
         _precio(id, _base?.tarifaBase ?? 0);
@@ -166,6 +181,7 @@ class _PerfilTecnicoViewState extends ConsumerState<PerfilTecnicoView> {
     if (guardado) {
       context.mostrarMensaje('Datos guardados.', tipo: TipoMensaje.exito);
     } else if (ref.read(guardarPerfilProvider) case AsyncError(:final error)) {
+      if (ofrecerPlanSiEsLimite(context, error)) return;
       context.mostrarMensaje(
         AsyncValueView.mensajeDe(error),
         tipo: TipoMensaje.error,
@@ -261,6 +277,8 @@ class _PerfilTecnicoViewState extends ConsumerState<PerfilTecnicoView> {
           child: _DatosTrabajo(
             precios: _precios,
             seleccionados: _seleccionados,
+            pausados: perfil.oficiosPausados.toSet(),
+            oficiosMax: perfil.oficiosMaxPlan,
             onOficio: _alternarOficio,
             guardando: guardando,
             onGuardar: () => _guardar(perfil),
@@ -298,6 +316,8 @@ class _PerfilTecnicoViewState extends ConsumerState<PerfilTecnicoView> {
           ),
           const SizedBox(height: Espacios.l),
           const MenuCuentaPerfil(),
+          const SizedBox(height: Espacios.l),
+          const EntradaMiPlan(),
           const SizedBox(height: Espacios.l),
           const EntradaMisReclamos(esCliente: false),
           const SizedBox(height: Espacios.l),
@@ -464,10 +484,18 @@ class _DatosTrabajo extends ConsumerWidget {
     required this.onOficio,
     required this.guardando,
     required this.onGuardar,
+    this.pausados = const {},
+    this.oficiosMax,
   });
 
   final Map<int, TextEditingController> precios;
   final Set<int> seleccionados;
+
+  /// Oficios pausados al bajar de plan: se reactivan al elegirlos.
+  final Set<int> pausados;
+
+  /// Tope de oficios activos del plan. Null: sin tope.
+  final int? oficiosMax;
   final ValueChanged<int> onOficio;
   final bool guardando;
   final VoidCallback onGuardar;
@@ -488,7 +516,11 @@ class _DatosTrabajo extends ConsumerWidget {
           const SizedBox(height: Espacios.l),
           Text('Mis oficios', style: etiqueta),
           Text(
-            'Verás solicitudes de los oficios que elijas.',
+            oficiosMax == null
+                ? 'Verás solicitudes de los oficios que elijas.'
+                : 'Verás solicitudes de los oficios que elijas. Tu plan '
+                      'permite $oficiosMax (${seleccionados.length} de '
+                      '$oficiosMax).',
             style: textos.bodySmall?.copyWith(color: Colores.tintaSuave),
           ),
           const SizedBox(height: Espacios.s),
@@ -510,7 +542,12 @@ class _DatosTrabajo extends ConsumerWidget {
                       for (final oficio in catalogo)
                         FilterChip(
                           avatar: Icon(iconoOficio(oficio.nombre), size: 18),
-                          label: Text(oficio.nombre),
+                          label: Text(
+                            pausados.contains(oficio.id) &&
+                                    !seleccionados.contains(oficio.id)
+                                ? '${oficio.nombre} · pausado'
+                                : oficio.nombre,
+                          ),
                           selected: seleccionados.contains(oficio.id),
                           onSelected: (_) => onOficio(oficio.id),
                         ),

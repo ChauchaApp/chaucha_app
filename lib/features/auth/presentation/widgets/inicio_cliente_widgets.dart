@@ -942,7 +942,7 @@ class TarjetasConfianza extends StatelessWidget {
         fondo: Colores.primarioSuave,
         color: Colores.primarioVivo,
         titulo: 'Técnicos 100 % verificados',
-        texto: 'Cédula y selfie revisadas por nuestro equipo.',
+        texto: 'Cédula y selfie verificadas con IA y comparación facial.',
         onTap: onVerificacion,
       ),
       TarjetaConfianza(

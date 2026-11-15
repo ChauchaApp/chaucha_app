@@ -88,7 +88,8 @@ export type Campo = 'cedula' | 'nombres' | 'apellidos' | 'codigo_dactilar';
 
 export type Decision =
   | { decision: 'aprobada' }
-  | { decision: 'revision'; motivos: string[] }
+  // El servicio de IA o de rostros falló: no se decide nada, se reintenta.
+  | { decision: 'reintentar' }
   | { decision: 'rechazada'; lado: Lado; motivo: string }
   | { decision: 'datos'; campos: Campo[] };
 
@@ -101,7 +102,10 @@ export type Entrada = {
   dactilar: Cotejo;
 };
 
+// La verificación es 100 % automática: nunca queda esperando a un asesor.
+// Cuando algo no está claro, se le pide al usuario repetir la foto concreta.
 export function decidir(e: Entrada): Decision {
+  if (e.esCedula === null || e.rostro === 'falla') return { decision: 'reintentar' };
   if (e.esCedula === false) {
     return {
       decision: 'rechazada',
@@ -138,13 +142,27 @@ export function decidir(e: Entrada): Decision {
   if (e.dactilar === 'no_coincide') campos.push('codigo_dactilar');
   if (campos.length > 0) return { decision: 'datos', campos };
 
-  const motivos: string[] = [];
-  if (e.esCedula === null) motivos.push('No se pudo leer la cédula automáticamente.');
-  if (e.rostro === 'medio') motivos.push('Similitud facial intermedia.');
-  if (e.rostro === 'falla') motivos.push('No se pudo comparar el rostro automáticamente.');
-  if (e.nombres === 'ilegible' || e.apellidos === 'ilegible') {
-    motivos.push('El nombre no se leyó con claridad.');
+  if (e.rostro === 'medio') {
+    return {
+      decision: 'rechazada',
+      lado: 'cedula_frontal',
+      motivo: 'No pudimos confirmar que el rostro de la cédula es el tuyo. Toma de nuevo el ' +
+        'frente de la cédula, de cerca, con buena luz y sin reflejos.',
+    };
   }
-  if (e.dactilar === 'ilegible') motivos.push('No se leyó el código dactilar.');
-  return motivos.length === 0 ? { decision: 'aprobada' } : { decision: 'revision', motivos };
+  if (e.nombres === 'ilegible' || e.apellidos === 'ilegible') {
+    return {
+      decision: 'rechazada',
+      lado: 'cedula_frontal',
+      motivo: 'No se lee bien tu nombre en la cédula. Toma de nuevo el frente, enfocado y sin reflejos.',
+    };
+  }
+  if (e.dactilar === 'ilegible') {
+    return {
+      decision: 'rechazada',
+      lado: 'cedula_posterior',
+      motivo: 'No se lee el código dactilar. Toma de nuevo el reverso de la cédula, enfocado y sin reflejos.',
+    };
+  }
+  return { decision: 'aprobada' };
 }

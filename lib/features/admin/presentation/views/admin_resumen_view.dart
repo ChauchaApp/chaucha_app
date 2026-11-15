@@ -10,6 +10,7 @@ import '../../../../core/widgets/seccion.dart';
 import '../../../../core/widgets/tarjeta_app.dart';
 import '../../../../core/widgets/tarjeta_portada.dart';
 import '../../../auth/presentation/providers/sesion_provider.dart';
+import '../../../reclamos/presentation/providers/reclamos_provider.dart';
 import '../../domain/entities/resumen_admin.dart';
 import '../providers/admin_providers.dart';
 import '../widgets/admin_widgets.dart';
@@ -21,13 +22,16 @@ class AdminResumenView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final resumen = ref.watch(resumenAdminProvider);
     final nombre = ref.watch(usuarioActualProvider)?.nombres;
-    final pendientes = resumen.value?.verificacionesPendientes;
+    // Reclamos nuevos, sin asesor todavía.
+    final pendientes = ref.watch(reclamosRecibidosProvider).value;
 
     return PantallaAdmin(
       titulo: 'Panel de administración',
-      subtitulo: 'Solicitudes, usuarios y verificaciones de ChauchaApp.',
-      onRecargar: () =>
-          esperarSinError(ref.refresh(resumenAdminProvider.future)),
+      subtitulo: 'Reclamos, solicitudes y usuarios de ChauchaApp.',
+      onRecargar: () async {
+        ref.invalidate(reclamosRecibidosProvider);
+        await esperarSinError(ref.refresh(resumenAdminProvider.future));
+      },
       children: [
         TarjetaPortada(
           titulo: nombre == null ? 'Hola.' : 'Hola, $nombre.',
@@ -35,22 +39,22 @@ class AdminResumenView extends ConsumerWidget {
           icono: Icons.admin_panel_settings_rounded,
           dato: switch (pendientes) {
             null => null,
-            0 => 'Sin verificaciones pendientes',
-            1 => '1 técnico por verificar',
-            final n => '$n técnicos por verificar',
+            0 => 'Sin reclamos por atender',
+            1 => '1 reclamo por atender',
+            final n => '$n reclamos por atender',
           },
           iconoDato: pendientes == 0
               ? Icons.task_alt_rounded
-              : Icons.badge_outlined,
+              : Icons.verified_user_outlined,
         ),
         if (pendientes != null && pendientes > 0) ...[
           const SizedBox(height: Espacios.l),
           const AvisoBanner(
             tipo: TipoAviso.aviso,
-            titulo: 'Hay cédulas por revisar',
+            titulo: 'Hay reclamos nuevos',
             mensaje:
-                'Revísalas en la pestaña "Verificaciones" para que esos '
-                'técnicos puedan recibir solicitudes.',
+                'Atiéndelos en la pestaña "Reclamos": tienen 30 días de '
+                'garantía y el usuario espera respuesta.',
           ),
         ],
         Seccion(
@@ -80,10 +84,10 @@ class AdminResumenView extends ConsumerWidget {
                   etiqueta: 'Técnicos verificados',
                 ),
                 _Cifra(
-                  icono: Icons.badge_outlined,
+                  icono: Icons.verified_user_outlined,
                   color: Colores.aviso,
-                  valor: r.verificacionesPendientes,
-                  etiqueta: 'Verificaciones pendientes',
+                  valor: pendientes ?? 0,
+                  etiqueta: 'Reclamos por atender',
                 ),
                 _Cifra(
                   icono: Icons.pending_actions_outlined,

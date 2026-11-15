@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/pestana_solicitada.dart';
+import '../../../../core/errors/app_failure.dart';
 import '../../../../core/media/selector_fotos.dart';
 import '../../../../core/providers/core_providers.dart';
 import '../../../../core/router/app_routes.dart';
@@ -35,6 +36,8 @@ import '../../../notificaciones/presentation/providers/notificaciones_provider.d
 import '../../../perfil_puntos/presentation/providers/perfil_tecnico_provider.dart';
 import '../../../perfil_puntos/presentation/widgets/escucha_calificaciones.dart';
 import '../../../perfil_puntos/presentation/widgets/resena_dialog.dart';
+import '../../../planes/presentation/providers/planes_provider.dart';
+import '../../../planes/presentation/widgets/limite_plan.dart';
 import '../../../reclamos/presentation/widgets/tarjeta_garantia.dart';
 import '../../domain/entities/detalle_solicitud.dart';
 import '../../domain/entities/foto_solicitud.dart';
@@ -79,6 +82,7 @@ class _SolicitudDetalleViewState extends ConsumerState<SolicitudDetalleView> {
   void _mostrarErrorDeAccion() {
     final estado = ref.read(accionesSolicitudProvider(widget.solicitudId));
     if (estado case AsyncError(:final error)) {
+      if (ofrecerPlanSiEsLimite(context, error)) return;
       context.mostrarMensaje(
         AsyncValueView.mensajeDe(error),
         tipo: TipoMensaje.error,
@@ -207,14 +211,42 @@ class _SolicitudDetalleViewState extends ConsumerState<SolicitudDetalleView> {
       );
       return;
     }
+    // Antes de pedir la selfie: si ya no quedan propuestas este mes, se
+    // ofrece subir de plan (el servidor igual lo valida).
+    if (await _sinPropuestasEsteMes() || !mounted) return;
     final solucion = await mostrarFormularioOferta(context, tarifaBase: tarifa);
     if (solucion == null || !mounted) return;
     // Cada oferta exige confirmar con el rostro que es el técnico.
     if (!await confirmarIdentidadParaOfertar(context, ref) || !mounted) return;
-    await _resultado(
+    final enviada = await _resultado(
       _acciones.enviarOferta(solucion: solucion),
       'Oferta enviada. Si al cliente le interesa, te escribirá.',
     );
+    // Actualiza el conteo de propuestas del mes.
+    if (enviada && mounted) ref.invalidate(miPlanProvider);
+  }
+
+  Future<bool> _sinPropuestasEsteMes() async {
+    try {
+      final miPlan = await ref.read(miPlanProvider.future);
+      final planes = await ref.read(planesProvider.future);
+      final plan = planes.where((p) => p.codigo == miPlan.codigo).firstOrNull;
+      final tope = plan?.cotizacionesMes;
+      if (tope == null || miPlan.cotizacionesUsadas < tope || !mounted) {
+        return false;
+      }
+      return ofrecerPlanSiEsLimite(
+        context,
+        AppFailure(
+          'Ya enviaste las $tope propuestas de este mes del plan '
+          '${plan!.nombre}.',
+          code: 'plan:limite_cotizaciones',
+        ),
+      );
+    } on Object {
+      // Si no se pudo leer el plan, decide el servidor al enviar.
+      return false;
+    }
   }
 
   Future<void> _editar(Solicitud solicitud) async {

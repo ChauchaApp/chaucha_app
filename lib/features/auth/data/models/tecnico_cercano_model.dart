@@ -28,6 +28,8 @@ class TecnicoCercanoModel {
       tarifaBase: aDouble(_json['tarifa_base']),
       nivel: _json['nivel'] as String? ?? '',
       fotoRuta: _json['foto_perfil_ruta'] as String?,
+      plan: _json['plan'] as String? ?? 'gratis',
+      destacado: _json['destacado'] as bool? ?? false,
     );
   }
 }
