@@ -30,6 +30,13 @@ class EncabezadoSolicitud extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(solicitud.descripcion, style: textos.bodyLarge),
+          if (solicitud.vehiculo case final vehiculo?) ...[
+            const SizedBox(height: Espacios.m),
+            _Dato(
+              icono: Icons.directions_car_outlined,
+              texto: vehiculo.resumen,
+            ),
+          ],
           if (direccion != null && direccion.isNotEmpty) ...[
             const SizedBox(height: Espacios.m),
             _Dato(icono: Icons.place_outlined, texto: direccion),

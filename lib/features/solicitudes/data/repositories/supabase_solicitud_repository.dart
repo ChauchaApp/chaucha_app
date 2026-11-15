@@ -16,6 +16,7 @@ import '../../domain/repositories/solicitud_repository.dart';
 import '../models/servicio_completado_model.dart';
 import '../models/solicitud_db.dart';
 import '../models/solicitud_model.dart';
+import '../models/vehiculo_db.dart';
 
 final solicitudRepositoryProvider = Provider<SolicitudRepository>(
   (ref) => SupabaseSolicitudRepository(
@@ -105,6 +106,7 @@ class SupabaseSolicitudRepository implements SolicitudRepository {
             'descripcion': nueva.descripcion.trim(),
             'ubicacion': GeoMapper.toPostGisPoint(nueva.ubicacion),
             'direccion_referencia': nueva.direccionReferencia?.trim(),
+            'vehiculo': VehiculoDb.aJson(nueva.vehiculo),
           })
           .select('id')
           .single();

@@ -12,6 +12,7 @@ class PerfilTecnico {
     required this.nivelNombre,
     required this.comisionPorcentaje,
     required this.oficioIds,
+    this.tarifas = const {},
     this.ubicacionActual,
     this.rangoBonusM = 0,
   });
@@ -31,6 +32,15 @@ class PerfilTecnico {
   final String nivelNombre;
   final double comisionPorcentaje;
   final List<int> oficioIds;
+
+  /// Precio de la visita por oficio (id del oficio → precio).
+  final Map<int, double> tarifas;
+
+  /// Precio de la visita para [oficioId]; sin uno propio, la tarifa base.
+  double tarifaPara(int oficioId) {
+    final propia = tarifas[oficioId];
+    return propia != null && propia > 0 ? propia : tarifaBase;
+  }
 
   /// Rango con el que realmente se buscan solicitudes (máx. 50 km).
   int get rangoEfectivoM => (rangoCoberturaM + rangoBonusM).clamp(0, 50000);

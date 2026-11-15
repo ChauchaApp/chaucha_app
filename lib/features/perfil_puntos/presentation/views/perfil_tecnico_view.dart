@@ -25,6 +25,7 @@ import '../../../auth/presentation/providers/sesion_provider.dart';
 import '../../../auth/presentation/views/perfil_cliente_view.dart';
 import '../../../catalogo/domain/entities/oficio.dart';
 import '../../../catalogo/presentation/providers/oficios_provider.dart';
+import '../../../catalogo/presentation/widgets/icono_oficio.dart';
 import '../../../publicidad/domain/entities/anuncio.dart';
 import '../../../publicidad/presentation/widgets/bloque_publicidad.dart';
 import '../../../reclamos/presentation/widgets/entrada_mis_reclamos.dart';
@@ -55,7 +56,9 @@ class PerfilTecnicoView extends ConsumerStatefulWidget {
 
 class _PerfilTecnicoViewState extends ConsumerState<PerfilTecnicoView> {
   final _formKey = GlobalKey<FormState>();
-  final _tarifa = TextEditingController();
+
+  /// Precio de la visita de cada oficio elegido.
+  final _precios = <int, TextEditingController>{};
   final _claveOficios = GlobalKey();
   final _claveZona = GlobalKey();
 
@@ -93,9 +96,19 @@ class _PerfilTecnicoViewState extends ConsumerState<PerfilTecnicoView> {
 
   @override
   void dispose() {
-    _tarifa.dispose();
+    for (final c in _precios.values) {
+      c.dispose();
+    }
     super.dispose();
   }
+
+  TextEditingController _precio(int oficioId, double valor) =>
+      _precios.putIfAbsent(
+        oficioId,
+        () => TextEditingController(
+          text: valor > 0 ? valor.toStringAsFixed(2) : '',
+        ),
+      );
 
   void _inicializar(PerfilTecnico perfil) {
     final base = _base;
@@ -109,28 +122,44 @@ class _PerfilTecnicoViewState extends ConsumerState<PerfilTecnicoView> {
       return;
     }
     _inicializado = true;
-    _tarifa.text = perfil.tarifaBase.toStringAsFixed(2);
     _seleccionados = perfil.oficioIds.toSet();
+    for (final id in perfil.oficioIds) {
+      _precio(id, perfil.tarifaPara(id));
+    }
   }
 
   void _alternarOficio(int id) {
     setState(() {
       final nuevo = {..._seleccionados};
-      if (!nuevo.remove(id)) nuevo.add(id);
+      if (!nuevo.remove(id)) {
+        nuevo.add(id);
+        // Arranca con el precio que ya cobra, para no dejarlo vacío.
+        _precio(id, _base?.tarifaBase ?? 0);
+      }
       _seleccionados = nuevo;
     });
   }
 
-  /// Guarda tarifa y oficios. La zona se cambia aparte, en su tarjeta.
+  double _leer(TextEditingController c) =>
+      double.tryParse(c.text.trim().replaceAll(',', '.')) ?? 0;
+
+  /// Guarda los oficios y el precio de la visita de cada uno. La zona se
+  /// cambia aparte, en su tarjeta.
   Future<void> _guardar(PerfilTecnico perfil) async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
+    final tarifas = {for (final id in _seleccionados) id: _leer(_precios[id]!)};
+    // La tarifa base queda como respaldo: el menor de sus precios.
+    final base = tarifas.values.isEmpty
+        ? perfil.tarifaBase
+        : tarifas.values.reduce((a, b) => a < b ? a : b);
     final guardado = await ref
         .read(guardarPerfilProvider.notifier)
         .guardar(
           CambiosPerfil(
-            tarifaBase: double.parse(_tarifa.text.trim().replaceAll(',', '.')),
+            tarifaBase: base,
             rangoCoberturaM: perfil.rangoCoberturaM,
             oficioIds: _seleccionados,
+            tarifas: tarifas,
           ),
         );
     if (!mounted) return;
@@ -230,7 +259,7 @@ class _PerfilTecnicoViewState extends ConsumerState<PerfilTecnicoView> {
         final datosTrabajo = KeyedSubtree(
           key: _claveOficios,
           child: _DatosTrabajo(
-            tarifa: _tarifa,
+            precios: _precios,
             seleccionados: _seleccionados,
             onOficio: _alternarOficio,
             guardando: guardando,
@@ -427,17 +456,17 @@ class _TituloTarjeta extends StatelessWidget {
   }
 }
 
-/// Tarifa base y oficios, con su botón de guardar.
+/// Oficios y el precio de la visita de cada uno, con su botón de guardar.
 class _DatosTrabajo extends ConsumerWidget {
   const _DatosTrabajo({
-    required this.tarifa,
+    required this.precios,
     required this.seleccionados,
     required this.onOficio,
     required this.guardando,
     required this.onGuardar,
   });
 
-  final TextEditingController tarifa;
+  final Map<int, TextEditingController> precios;
   final Set<int> seleccionados;
   final ValueChanged<int> onOficio;
   final bool guardando;
@@ -446,6 +475,7 @@ class _DatosTrabajo extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final textos = Theme.of(context).textTheme;
+    final etiqueta = textos.labelLarge?.copyWith(fontWeight: FontWeight.w700);
     return TarjetaInicio(
       padding: const EdgeInsets.all(Espacios.l + 2),
       child: Column(
@@ -456,34 +486,7 @@ class _DatosTrabajo extends ConsumerWidget {
             subtitulo: 'Lo que ven los clientes cuando postulas.',
           ),
           const SizedBox(height: Espacios.l),
-          Text(
-            'Precio por la visita',
-            style: textos.labelLarge?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: Espacios.s),
-          // Campo corto: un precio no necesita todo el ancho.
-          Align(
-            alignment: Alignment.centerLeft,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 260),
-              child: TextFormField(
-                controller: tarifa,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.attach_money),
-                  hintText: '0.00',
-                ),
-                validator: (v) => FormValidators.monto(v, campo: 'La tarifa'),
-              ),
-            ),
-          ),
-          const SizedBox(height: Espacios.l),
-          Text(
-            'Mis oficios',
-            style: textos.labelLarge?.copyWith(fontWeight: FontWeight.w700),
-          ),
+          Text('Mis oficios', style: etiqueta),
           Text(
             'Verás solicitudes de los oficios que elijas.',
             style: textos.bodySmall?.copyWith(color: Colores.tintaSuave),
@@ -492,18 +495,85 @@ class _DatosTrabajo extends ConsumerWidget {
           AsyncValueView<List<Oficio>>(
             value: ref.watch(oficiosProvider),
             onRetry: () => ref.invalidate(oficiosProvider),
-            onData: (context, catalogo) => Wrap(
-              spacing: Espacios.s,
-              runSpacing: Espacios.s,
-              children: [
-                for (final oficio in catalogo)
-                  FilterChip(
-                    label: Text(oficio.nombre),
-                    selected: seleccionados.contains(oficio.id),
-                    onSelected: (_) => onOficio(oficio.id),
+            onData: (context, catalogo) {
+              final elegidos = [
+                for (final o in catalogo)
+                  if (seleccionados.contains(o.id)) o,
+              ];
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Wrap(
+                    spacing: Espacios.s,
+                    runSpacing: Espacios.s,
+                    children: [
+                      for (final oficio in catalogo)
+                        FilterChip(
+                          avatar: Icon(iconoOficio(oficio.nombre), size: 18),
+                          label: Text(oficio.nombre),
+                          selected: seleccionados.contains(oficio.id),
+                          onSelected: (_) => onOficio(oficio.id),
+                        ),
+                    ],
                   ),
-              ],
-            ),
+                  const SizedBox(height: Espacios.l),
+                  Text('Precio por la visita', style: etiqueta),
+                  Text(
+                    'Cada oficio puede costar distinto.',
+                    style: textos.bodySmall?.copyWith(
+                      color: Colores.tintaSuave,
+                    ),
+                  ),
+                  const SizedBox(height: Espacios.s),
+                  if (elegidos.isEmpty)
+                    Text(
+                      'Elige al menos un oficio.',
+                      style: textos.bodyMedium?.copyWith(
+                        color: Colores.tintaSuave,
+                      ),
+                    ),
+                  for (final oficio in elegidos)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: Espacios.s),
+                      child: Row(
+                        children: [
+                          Icon(
+                            iconoOficio(oficio.nombre),
+                            size: 20,
+                            color: Colores.primario,
+                          ),
+                          const SizedBox(width: Espacios.s),
+                          Expanded(
+                            child: Text(
+                              oficio.nombre,
+                              style: textos.bodyLarge,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: Espacios.m),
+                          SizedBox(
+                            width: 140,
+                            child: TextFormField(
+                              key: ValueKey('precio-${oficio.id}'),
+                              controller: precios[oficio.id],
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
+                              decoration: const InputDecoration(
+                                prefixIcon: Icon(Icons.attach_money),
+                                hintText: '0.00',
+                              ),
+                              validator: (v) =>
+                                  FormValidators.monto(v, campo: 'El precio'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: Espacios.l),
           Align(

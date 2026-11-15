@@ -3,7 +3,9 @@ import 'package:latlong2/latlong.dart';
 import '../../../../core/geo/geo_mapper.dart';
 import '../../../../core/utils/json_utils.dart';
 import '../../domain/entities/solicitud.dart';
+import '../../domain/entities/vehiculo.dart';
 import 'solicitud_db.dart';
+import 'vehiculo_db.dart';
 
 class SolicitudModel {
   const SolicitudModel({
@@ -19,6 +21,7 @@ class SolicitudModel {
     this.clienteNombre,
     this.clienteFotoRuta,
     this.clienteVerificado = false,
+    this.vehiculo,
     this.completadaEn,
   });
 
@@ -43,6 +46,7 @@ class SolicitudModel {
       clienteNombre: nombreCorto.isEmpty ? null : nombreCorto,
       clienteFotoRuta: cliente?['foto_perfil_ruta'] as String?,
       clienteVerificado: cliente?['verificado'] == true,
+      vehiculo: VehiculoDb.desdeJson(json['vehiculo']),
       completadaEn: json['completada_en'] is String
           ? aFecha(json['completada_en']).toLocal()
           : null,
@@ -52,7 +56,7 @@ class SolicitudModel {
   /// Columnas que se piden en el `select`, con el join al oficio.
   static const String columnas =
       'id, cliente_id, oficio_id, descripcion, '
-      'ubicacion, direccion_referencia, estado, creado_en, completada_en, '
+      'ubicacion, direccion_referencia, vehiculo, estado, creado_en, completada_en, '
       'oficios(nombre), '
       'cliente:usuarios!fk_solicitudes_cliente(nombres, apellidos, foto_perfil_ruta, verificado)';
 
@@ -68,6 +72,7 @@ class SolicitudModel {
   final String? clienteNombre;
   final String? clienteFotoRuta;
   final bool clienteVerificado;
+  final Vehiculo? vehiculo;
   final DateTime? completadaEn;
 
   Solicitud aEntidad() => Solicitud(
@@ -83,6 +88,7 @@ class SolicitudModel {
     clienteNombre: clienteNombre,
     clienteFotoRuta: clienteFotoRuta,
     clienteVerificado: clienteVerificado,
+    vehiculo: vehiculo,
     completadaEn: completadaEn,
   );
 }

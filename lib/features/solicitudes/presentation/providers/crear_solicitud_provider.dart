@@ -8,6 +8,7 @@ import '../../../../core/errors/app_failure.dart';
 import '../../../../core/errors/async_guard.dart';
 import '../../data/repositories/supabase_solicitud_repository.dart';
 import '../../domain/entities/nueva_solicitud.dart';
+import '../../domain/entities/vehiculo.dart';
 import 'listas_provider.dart';
 
 final crearSolicitudProvider =
@@ -26,6 +27,7 @@ class CrearSolicitudNotifier extends AsyncNotifier<String?> {
     required String direccion,
     required LatLng ubicacion,
     required List<Uint8List> fotos,
+    Vehiculo? vehiculo,
   }) async {
     if (state.isLoading) return null;
 
@@ -44,6 +46,7 @@ class CrearSolicitudNotifier extends AsyncNotifier<String?> {
               ubicacion: ubicacion,
               direccionReferencia: referencia.isEmpty ? null : referencia,
               fotos: fotos,
+              vehiculo: vehiculo,
             ),
           );
     });

@@ -198,6 +198,12 @@ class CabeceraSolicitud extends StatelessWidget {
           'Publicada el ${_fechaHora(s.creadoEn.toLocal())}',
           estilo: gris,
         ),
+        if (s.vehiculo case final vehiculo?)
+          _ConIcono(
+            Icons.directions_car_outlined,
+            vehiculo.resumen,
+            estilo: gris,
+          ),
         if (direccion != null && direccion.isNotEmpty)
           _ConIcono(Icons.location_on_outlined, direccion, estilo: gris),
       ],
