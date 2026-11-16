@@ -19,12 +19,17 @@ class TarjetaGarantia extends ConsumerWidget {
     required this.solicitudId,
     required this.completadaEn,
     required this.esCliente,
+    this.conAccion = true,
     this.ahora,
   });
 
   final String solicitudId;
   final DateTime completadaEn;
   final bool esCliente;
+
+  /// Sin el botón de reportar ni el reclamo abierto: cuando la pantalla ya los
+  /// muestra junto a su acción principal (detalle de la solicitud).
+  final bool conAccion;
 
   /// Solo para pruebas.
   final DateTime? ahora;
@@ -116,7 +121,7 @@ class TarjetaGarantia extends ConsumerWidget {
                 ),
               ),
             ],
-            if (abierto != null || vigente) ...[
+            if (conAccion && (abierto != null || vigente)) ...[
               const SizedBox(height: Espacios.m),
               accion,
             ],

@@ -38,6 +38,8 @@ import '../../../perfil_puntos/presentation/widgets/escucha_calificaciones.dart'
 import '../../../perfil_puntos/presentation/widgets/resena_dialog.dart';
 import '../../../planes/presentation/providers/planes_provider.dart';
 import '../../../planes/presentation/widgets/limite_plan.dart';
+import '../../../reclamos/domain/entities/reclamo.dart';
+import '../../../reclamos/presentation/providers/reclamos_provider.dart';
 import '../../../reclamos/presentation/widgets/formulario_reclamo.dart';
 import '../../../reclamos/presentation/widgets/tarjeta_garantia.dart';
 import '../../domain/entities/detalle_solicitud.dart';
@@ -390,25 +392,23 @@ class _SolicitudDetalleViewState extends ConsumerState<SolicitudDetalleView> {
             cargando: procesando,
             onPressed: accion.alPulsar,
           );
-    if (datos != null && boton != null && _puedeReportar(datos)) {
-      // Antes de confirmar, el cliente puede avisar que algo salió mal.
-      boton = _ConfirmarOReportar(
-        confirmar: boton,
-        onReportar: procesando
-            ? null
-            : () => unawaited(
-                reportarProblema(
-                  context,
-                  solicitudId: widget.solicitudId,
-                  esCliente: true,
-                ),
-              ),
-      );
-    } else if (datos != null &&
+    if (datos != null &&
         boton == null &&
         datos.estado == EstadoSolicitud.completada &&
         datos.miCalificacion != null) {
       boton = _YaCalificado(estrellas: datos.miCalificacion!);
+    }
+    if (datos != null && boton != null && _puedeReportar(datos)) {
+      // Antes de confirmar o durante la garantía, el cliente puede avisar que
+      // algo salió mal (o ver el reclamo que ya abrió).
+      boton = _ConReclamo(
+        principal: boton,
+        reclamo: _BotonReclamo(
+          solicitudId: widget.solicitudId,
+          esCliente: datos.soyCliente,
+          habilitado: !procesando,
+        ),
+      );
     }
 
     return PantallaSecundaria(
@@ -497,6 +497,8 @@ class _SolicitudDetalleViewState extends ConsumerState<SolicitudDetalleView> {
         solicitudId: d.solicitud.id,
         completadaEn: completadaEn,
         esCliente: d.soyCliente,
+        // El reclamo ya está junto a calificar.
+        conAccion: !_puedeReportar(d),
       ),
     ];
   }
@@ -618,8 +620,16 @@ class _SolicitudDetalleViewState extends ConsumerState<SolicitudDetalleView> {
     );
   }
 
-  bool _puedeReportar(DetalleSolicitud d) =>
-      d.soyCliente && d.estado == EstadoSolicitud.porConfirmar;
+  /// Cliente: antes de confirmar y durante la garantía. Técnico asignado:
+  /// durante la garantía (antes de confirmar solo reclama el cliente).
+  bool _puedeReportar(DetalleSolicitud d) {
+    if (!d.soyCliente && !d.soyTecnicoAsignado) return false;
+    if (d.estado == EstadoSolicitud.porConfirmar) return d.soyCliente;
+    final completadaEn = d.solicitud.completadaEn;
+    return d.estado == EstadoSolicitud.completada &&
+        completadaEn != null &&
+        Garantia(completadaEn: completadaEn).vigente(DateTime.now());
+  }
 
   _Accion? _accionPrincipal(DetalleSolicitud d) {
     final estado = d.estado;
@@ -898,51 +908,82 @@ class _Escritorio extends StatelessWidget {
   }
 }
 
-/// "Confirmar trabajo" con "Reportar problema" al lado (debajo en el celular).
-class _ConfirmarOReportar extends StatelessWidget {
-  const _ConfirmarOReportar({
-    required this.confirmar,
-    required this.onReportar,
-  });
+/// La acción principal (confirmar, calificar...) con el botón de reclamo al
+/// lado; debajo en el celular, donde no caben sin partir el texto.
+class _ConReclamo extends StatelessWidget {
+  const _ConReclamo({required this.principal, required this.reclamo});
 
-  final Widget confirmar;
-  final VoidCallback? onReportar;
+  final Widget principal;
+  final Widget reclamo;
 
   @override
   Widget build(BuildContext context) {
-    final reportar = OutlinedButton.icon(
-      onPressed: onReportar,
-      style: OutlinedButton.styleFrom(
-        foregroundColor: Colores.error,
-        side: const BorderSide(color: Colores.error),
-      ),
-      icon: const Icon(Icons.report_problem_outlined),
-      label: const Text('Reportar problema'),
-    );
     return LayoutBuilder(
       builder: (context, r) {
-        // En el celular no caben lado a lado sin partir el texto: van uno
-        // sobre otro, con confirmar arriba.
         if (r.maxWidth < 560) {
           return Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              confirmar,
+              principal,
               const SizedBox(height: Espacios.s),
-              reportar,
+              reclamo,
             ],
           );
         }
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            reportar,
+            principal,
             const SizedBox(width: Espacios.m),
-            confirmar,
+            reclamo,
           ],
         );
       },
+    );
+  }
+}
+
+/// "Reportar problema", o "Ver mi reclamo" si ya hay uno abierto.
+class _BotonReclamo extends ConsumerWidget {
+  const _BotonReclamo({
+    required this.solicitudId,
+    required this.esCliente,
+    required this.habilitado,
+  });
+
+  final String solicitudId;
+  final bool esCliente;
+  final bool habilitado;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final abierto = ref.watch(reclamoAbiertoProvider(solicitudId)).value;
+    if (abierto != null) {
+      return OutlinedButton.icon(
+        onPressed: () => unawaited(
+          context.push(AppRoutes.reclamo(abierto.id, esCliente: esCliente)),
+        ),
+        icon: const Icon(Icons.support_agent_outlined),
+        label: const Text('Ver mi reclamo'),
+      );
+    }
+    return OutlinedButton.icon(
+      onPressed: habilitado
+          ? () => unawaited(
+              reportarProblema(
+                context,
+                solicitudId: solicitudId,
+                esCliente: esCliente,
+              ),
+            )
+          : null,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: Colores.error,
+        side: const BorderSide(color: Colores.error),
+      ),
+      icon: const Icon(Icons.report_problem_outlined),
+      label: const Text('Reportar problema'),
     );
   }
 }
