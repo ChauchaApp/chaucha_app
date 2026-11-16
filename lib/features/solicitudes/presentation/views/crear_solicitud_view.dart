@@ -7,7 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../../core/geo/geo_mapper.dart';
-import '../../../../core/media/selector_fotos.dart';
+import '../../../../core/media/elegir_fotos.dart';
 import '../../../../core/providers/core_providers.dart';
 import '../../../../core/theme/tokens.dart';
 import '../../../../core/validators/form_validators.dart';
@@ -116,7 +116,8 @@ class _CrearSolicitudViewState extends ConsumerState<CrearSolicitudView> {
   }
 
   Future<void> _agregarFotos() async {
-    final nuevas = await SelectorFotos.elegir(
+    final nuevas = await elegirFotos(
+      context,
       maximo: NuevaSolicitud.maximoFotos - _fotos.length,
     );
     if (!mounted) return;

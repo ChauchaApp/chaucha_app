@@ -6,7 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app/pestana_solicitada.dart';
 import '../../../../core/errors/app_failure.dart';
-import '../../../../core/media/selector_fotos.dart';
+import '../../../../core/media/elegir_fotos.dart';
 import '../../../../core/providers/core_providers.dart';
 import '../../../../core/router/app_routes.dart';
 import '../../../../core/theme/tokens.dart';
@@ -289,7 +289,7 @@ class _SolicitudDetalleViewState extends ConsumerState<SolicitudDetalleView> {
   }
 
   Future<void> _marcarTerminada() async {
-    final evidencias = await SelectorFotos.elegir(maximo: 3);
+    final evidencias = await elegirFotos(context, maximo: 3);
     if (!mounted) return;
     if (evidencias.isEmpty) {
       context.mostrarMensaje(
@@ -481,7 +481,7 @@ class _SolicitudDetalleViewState extends ConsumerState<SolicitudDetalleView> {
   }
 
   Future<void> _agregarFotos() async {
-    final fotos = await SelectorFotos.elegir(maximo: 5);
+    final fotos = await elegirFotos(context, maximo: 5);
     if (!mounted || fotos.isEmpty) return;
     await _resultado(_acciones.agregarFotos(fotos), 'Fotos agregadas.');
   }

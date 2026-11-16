@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/media/elegir_fotos.dart';
 import '../../../../core/media/selector_fotos.dart';
 import '../../../../core/media/selfie_camara.dart';
 import '../../../../core/theme/tokens.dart';
@@ -64,7 +65,7 @@ class _VerificacionPanelState extends ConsumerState<VerificacionPanel> {
   bool _enviandoSelfie = false;
 
   Future<void> _subirLado(TipoDocumento tipo) async {
-    final camara = kIsWeb ? false : await _elegirOrigen();
+    final camara = kIsWeb ? false : await elegirOrigenFoto(context);
     if (camara == null || !mounted) return;
     final seguir = await _pedirLado(tipo, camara);
     if (seguir != true || !mounted) return;
@@ -145,29 +146,6 @@ class _VerificacionPanelState extends ConsumerState<VerificacionPanel> {
             child: Text(camara ? 'Tomar foto' : 'Elegir foto'),
           ),
         ],
-      ),
-    );
-  }
-
-  Future<bool?> _elegirOrigen() {
-    return showModalBottomSheet<bool>(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo_camera_outlined),
-              title: const Text('Tomar foto'),
-              onTap: () => Navigator.pop(context, true),
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('Elegir de la galería'),
-              onTap: () => Navigator.pop(context, false),
-            ),
-          ],
-        ),
       ),
     );
   }

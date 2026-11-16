@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/media/selector_fotos.dart';
+import '../../../../core/media/elegir_fotos.dart';
 import '../../../../core/router/app_routes.dart';
 import '../../../../core/theme/tokens.dart';
 import '../../../../core/widgets/async_value_view.dart';
@@ -96,7 +96,8 @@ class _FormularioReclamoState extends ConsumerState<_FormularioReclamo> {
       _categoria != null && _texto.text.trim().length >= _minimoCaracteres;
 
   Future<void> _agregarFotos() async {
-    final nuevas = await SelectorFotos.elegir(
+    final nuevas = await elegirFotos(
+      context,
       maximo: _maximoFotos - _fotos.length,
     );
     if (!mounted || nuevas.isEmpty) return;
