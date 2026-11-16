@@ -48,6 +48,9 @@ final routerProvider = Provider<GoRouter>((ref) {
 
   late final GoRouter router;
 
+  /// Ruta abierta antes de que la sesión terminara de cargar.
+  String? destinoPendiente;
+
   Future<void> cerrarSesion() async {
     await ref.read(sesionProvider.notifier).cerrarSesion();
     router.go(AppRoutes.login);
@@ -220,10 +223,25 @@ final routerProvider = Provider<GoRouter>((ref) {
   router = GoRouter(
     initialLocation: AppRoutes.splash,
     refreshListenable: cambiosDeSesion,
-    redirect: (context, state) => resolverRedireccion(
-      sesion: ref.read(sesionProvider),
-      ubicacion: state.matchedLocation,
-    ),
+    redirect: (context, state) {
+      final sesion = ref.read(sesionProvider);
+      final ubicacion = state.matchedLocation;
+      // Al refrescar se pasa por el splash mientras se carga la sesión: se
+      // guarda la ruta para volver a ella y no caer en el inicio.
+      if (sesion is SesionVerificando) {
+        if (ubicacion != AppRoutes.splash) {
+          destinoPendiente = state.uri.toString();
+        }
+        return resolverRedireccion(sesion: sesion, ubicacion: ubicacion);
+      }
+      final pendiente = destinoPendiente;
+      destinoPendiente = null;
+      return resolverRedireccion(
+        sesion: sesion,
+        ubicacion: ubicacion,
+        pendiente: pendiente,
+      );
+    },
     routes: [
       GoRoute(
         path: AppRoutes.splash,

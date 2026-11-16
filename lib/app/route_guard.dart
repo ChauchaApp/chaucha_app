@@ -8,10 +8,22 @@ String rutaInicioPara(Rol rol) => switch (rol) {
   Rol.admin => AppRoutes.adminInicio,
 };
 
+/// [pendiente] es la ruta que se abrió mientras se verificaba la sesión (al
+/// refrescar la web): al salir del splash se vuelve a ella si está permitida.
 String? resolverRedireccion({
   required SesionEstado sesion,
   required String ubicacion,
+  String? pendiente,
 }) {
+  if (pendiente != null &&
+      ubicacion == AppRoutes.splash &&
+      sesion is! SesionVerificando) {
+    final ruta = Uri.parse(pendiente).path;
+    if (ruta != AppRoutes.splash &&
+        resolverRedireccion(sesion: sesion, ubicacion: ruta) == null) {
+      return pendiente;
+    }
+  }
   if (AppRoutes.legales.contains(ubicacion) && sesion is! SesionVerificando) {
     return null;
   }

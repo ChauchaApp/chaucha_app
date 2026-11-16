@@ -251,4 +251,39 @@ void main() {
       );
     });
   });
+
+  group('al refrescar la web', () {
+    String? volver(SesionEstado sesion, String pendiente) =>
+        resolverRedireccion(
+          sesion: sesion,
+          ubicacion: AppRoutes.splash,
+          pendiente: pendiente,
+        );
+
+    test('con sesión vuelve a la ruta que estaba abierta', () {
+      expect(
+        volver(_con(Rol.tecnico), '/tecnico/solicitud/7'),
+        '/tecnico/solicitud/7',
+      );
+      expect(
+        volver(_con(Rol.cliente), '/privacidad?seccion=verificacion'),
+        '/privacidad?seccion=verificacion',
+      );
+    });
+
+    test('una ruta de otro rol no se respeta', () {
+      expect(
+        volver(_con(Rol.cliente), '/tecnico/planes'),
+        AppRoutes.clienteInicio,
+      );
+    });
+
+    test('sin sesión va a login', () {
+      expect(volver(const SinSesion(), '/cliente/nueva'), AppRoutes.login);
+    });
+
+    test('mientras verifica sigue en el splash', () {
+      expect(volver(const SesionVerificando(), '/cliente/nueva'), isNull);
+    });
+  });
 }

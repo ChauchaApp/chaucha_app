@@ -12,6 +12,7 @@ import '../core/push/push_service.dart';
 import '../core/router/app_routes.dart';
 import '../core/theme/tokens.dart';
 import '../core/utils/formatos.dart';
+import '../core/web/memoria_pestana.dart';
 import '../core/widgets/etiqueta_sector.dart';
 import '../core/widgets/foto_perfil_caja.dart';
 import '../core/widgets/hoja_clara.dart';
@@ -150,12 +151,22 @@ class _InicioShellState extends ConsumerState<InicioShell> {
 
   bool get _esSecundaria => widget.pagina != null;
 
+  String get _rutaMemoria => widget.rutaInicio ?? AppRoutes.clienteInicio;
+
   @override
   void initState() {
     super.initState();
     if (_esSecundaria) {
       _indice = ref.read(pestanaActualProvider);
       return;
+    }
+    // Al refrescar la web vuelve a la pestaña que estaba abierta.
+    final guardada = MemoriaPestana.leer(_rutaMemoria);
+    if (guardada != null && guardada > 0 && guardada < widget.destinos.length) {
+      _indice = guardada;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) ref.read(pestanaActualProvider.notifier).fijar(guardada);
+      });
     }
     final push = ref.read(pushServiceProvider);
     _toques = push.toques.listen(_abrirDesdePush);
@@ -203,6 +214,7 @@ class _InicioShellState extends ConsumerState<InicioShell> {
     }
     setState(() => _indice = indice);
     ref.read(pestanaActualProvider.notifier).fijar(indice);
+    MemoriaPestana.guardar(_rutaMemoria, indice);
     final destino = widget.destinos[indice];
     if (destino.tiposNotificacion.isEmpty || !destino.marcaAlEntrar) return;
     final tipos = destino.tiposNotificacion;
