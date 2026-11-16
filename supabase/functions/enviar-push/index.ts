@@ -21,6 +21,8 @@ const TITULOS: Record<string, string> = {
   tarifa_cancelada: 'Tarifa cancelada',
   cierre: 'Servicio cerrado',
   solicitud_expirada: 'Solicitud expirada',
+  solicitud_nueva: 'Nueva solicitud de trabajo',
+  trabajo_terminado: 'Trabajo terminado',
   sancion: 'Cuenta suspendida',
   sancion_aviso: 'Cuidado con tus reseñas',
   sancion_fin: 'Suspensión terminada',

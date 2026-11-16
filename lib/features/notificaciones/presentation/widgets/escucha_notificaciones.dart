@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/widgets/mensajes.dart';
 import '../../../auth/presentation/providers/sesion_provider.dart';
 import '../../../perfil_puntos/presentation/providers/verificacion_provider.dart';
+import '../../../solicitudes/presentation/providers/feed_provider.dart';
 import '../../domain/entities/notificacion.dart';
 import '../providers/notificaciones_provider.dart';
 
@@ -27,6 +28,10 @@ class _EstadoEscucha extends ConsumerState<EscuchaNotificaciones> {
     const recargan = {'sancion', 'sancion_fin', 'verificacion'};
     final verificacion = nuevas.any((n) => n.tipo == 'verificacion');
     if (verificacion) ref.invalidate(verificacionProvider);
+    // Por si el tiempo real de solicitudes se cortó: el aviso trae el trabajo.
+    if (nuevas.any((n) => n.tipo == 'solicitud_nueva')) {
+      ref.invalidate(feedProvider);
+    }
     if (nuevas.any((n) => recargan.contains(n.tipo))) {
       try {
         await ref.read(sesionProvider.notifier).recargarUsuario();

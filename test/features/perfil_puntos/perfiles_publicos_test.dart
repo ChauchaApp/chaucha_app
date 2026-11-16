@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:tecnicos_app/app/inicio_shell.dart';
 import 'package:tecnicos_app/core/presence/presencia_service.dart';
 import 'package:tecnicos_app/core/providers/core_providers.dart';
+import 'package:tecnicos_app/core/providers/sincronizacion_provider.dart';
 import 'package:tecnicos_app/core/widgets/etiqueta_sector.dart';
 import 'package:tecnicos_app/features/auth/domain/entities/rol.dart';
 import 'package:tecnicos_app/features/auth/domain/entities/usuario.dart';
@@ -143,6 +144,7 @@ Future<void> _montar(
       retry: (_, _) => null,
       overrides: [
         usuarioActualProvider.overrideWithValue(_cliente),
+        sincronizacionProvider.overrideWith((ref) {}),
         supabaseClientProvider.overrideWithValue(
           SupabaseClient(
             'http://localhost',

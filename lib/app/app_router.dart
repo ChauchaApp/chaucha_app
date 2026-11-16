@@ -96,7 +96,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         MisSolicitudesView(),
         iconoActivo: Icons.assignment_rounded,
         corto: 'Solicitudes',
-        tiposNotificacion: ['cotizacion', 'tarifa', 'solicitud_expirada'],
+        tiposNotificacion: [
+          'cotizacion',
+          'tarifa',
+          'solicitud_expirada',
+          'trabajo_terminado',
+        ],
         marcaAlEntrar: false,
       ),
       Destino(
@@ -136,6 +141,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         InicioTecnicoView(),
         iconoActivo: Icons.home_rounded,
         saludo: 'Estos son los trabajos de tu zona',
+        tiposNotificacion: ['solicitud_nueva'],
       ),
       Destino(
         'Mis trabajos',

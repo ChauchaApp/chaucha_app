@@ -198,6 +198,28 @@ class _InicioShellState extends ConsumerState<InicioShell> {
       );
       return;
     }
+    // Trabajo nuevo (técnico) o trabajo terminado (cliente): abre la
+    // solicitud para postularse o para confirmar el cierre.
+    const deSolicitud = {'solicitud_nueva', 'trabajo_terminado'};
+    if (deSolicitud.contains(toque.tipo) && referencia != null) {
+      final uid = ref.read(supabaseClientProvider).auth.currentUser?.id;
+      if (uid != null) {
+        unawaited(
+          ref
+              .read(notificacionesRepoProvider)
+              .marcarLeidas(uid, tipos: [toque.tipo], referenciaId: referencia),
+        );
+      }
+      unawaited(
+        context.push(
+          AppRoutes.detalleSolicitud(
+            referencia,
+            esCliente: toque.tipo == 'trabajo_terminado',
+          ),
+        ),
+      );
+      return;
+    }
     final i = widget.destinos.indexWhere(
       (d) => d.tiposNotificacion.contains(toque.tipo),
     );
@@ -256,13 +278,15 @@ class _InicioShellState extends ConsumerState<InicioShell> {
 
   @override
   Widget build(BuildContext context) {
+    // También en el detalle y demás pantallas secundarias: los cambios de
+    // estado (trabajo terminado, cierre...) llegan sin refrescar.
+    ref.watch(sincronizacionProvider);
     final pagina = widget.pagina;
     if (pagina != null) {
       final ancho = MediaQuery.sizeOf(context).width;
       final web = widget.claro && ancho >= InicioShell.anchoMenuLateral;
       return web ? _paginaClara(context, ancho, secundaria: pagina) : pagina;
     }
-    ref.watch(sincronizacionProvider);
     ref.watch(presenciaProvider);
     ref.listen(pestanaSolicitadaProvider, (_, titulo) {
       if (titulo == null) return;

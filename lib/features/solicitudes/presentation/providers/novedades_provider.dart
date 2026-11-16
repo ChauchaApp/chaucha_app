@@ -5,7 +5,12 @@ import '../../../notificaciones/domain/entities/notificacion.dart';
 import '../../../notificaciones/presentation/providers/notificaciones_provider.dart';
 import 'listas_provider.dart';
 
-const tiposDeSolicitud = ['cotizacion', 'tarifa', 'cierre'];
+const tiposDeSolicitud = [
+  'cotizacion',
+  'tarifa',
+  'cierre',
+  'trabajo_terminado',
+];
 
 final novedadesPorSolicitudProvider =
     FutureProvider.autoDispose<Map<String, int>>((ref) async {
@@ -27,7 +32,8 @@ final novedadesPorSolicitudProvider =
 
       final cuenta = <String, int>{};
       for (final n in relevantes) {
-        final solicitud = n.tipo == 'cierre'
+        // Estos avisos apuntan a la solicitud; los demás, a la cotización.
+        final solicitud = n.tipo == 'cierre' || n.tipo == 'trabajo_terminado'
             ? n.referenciaId!
             : cotASolicitud[n.referenciaId];
         if (solicitud != null && ids.contains(solicitud)) {
