@@ -226,7 +226,9 @@ void main() {
     );
     expect(find.text('Completada'), findsWidgets);
     expect(find.text('Garantía ChauchaApp'), findsOneWidget);
-    expect(find.text('Reportar un problema'), findsOneWidget);
+    // El botón de reclamo va junto a calificar, no repetido en la tarjeta.
+    expect(find.text('Reportar problema'), findsOneWidget);
+    expect(find.text('Reportar un problema'), findsNothing);
   });
 
   testWidgets('cancelada: aviso en lugar del progreso y sin editar', (
@@ -291,6 +293,9 @@ void main() {
       );
       expect(find.text('Calificar al técnico'), findsOneWidget);
       expect(find.text('Ya calificaste'), findsNothing);
+      // Dentro de la garantía, el reclamo va junto a calificar (una sola vez).
+      expect(find.text('Reportar problema'), findsOneWidget);
+      expect(find.text('Reportar un problema'), findsNothing);
     });
 
     testWidgets('ya calificado muestra la nota y no vuelve a pedirla', (
@@ -305,6 +310,7 @@ void main() {
       );
       expect(find.text('Calificar al técnico'), findsNothing);
       expect(find.text('Ya calificaste'), findsOneWidget);
+      expect(find.text('Reportar problema'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   });
