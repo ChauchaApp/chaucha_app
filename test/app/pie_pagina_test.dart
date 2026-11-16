@@ -59,7 +59,7 @@ Future<void> _montar(WidgetTester tester, Size tamano) async {
 }
 
 void main() {
-  for (final ancho in [390.0, 900.0, 1920.0]) {
+  for (final ancho in [360.0, 700.0, 900.0, 1920.0]) {
     testWidgets('el pie se arma sin desbordes a $ancho px', (tester) async {
       await _montar(tester, Size(ancho, 1200));
       expect(find.text('Cómo funciona'), findsOneWidget);
