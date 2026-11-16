@@ -25,6 +25,9 @@ class PiePagina extends ConsumerWidget {
 
   static const double anchoColumnas = 900;
 
+  /// Desde este ancho las tres cajas del pie van en una sola fila.
+  static const double anchoCajasEnFila = 600;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Dentro de una pestaña con scroll de página, el pie lo pone el shell.
@@ -40,9 +43,10 @@ class PiePagina extends ConsumerWidget {
     };
     void ir(String ruta) => unawaited(context.push(ruta));
 
-    final columnas = [
-      _Columna(
+    final secciones = [
+      _Seccion(
         titulo: 'ChauchaApp',
+        icono: Icons.handyman_outlined,
         enlaces: [
           ('Cómo funciona', () => unawaited(mostrarComoFunciona(context))),
           ('Garantía de 30 días', () => unawaited(mostrarGarantia(context))),
@@ -52,8 +56,9 @@ class PiePagina extends ConsumerWidget {
           ),
         ],
       ),
-      _Columna(
+      _Seccion(
         titulo: 'Ayuda',
+        icono: Icons.support_agent_outlined,
         enlaces: [
           ('Centro de ayuda', () => unawaited(mostrarAyuda(context))),
           (
@@ -68,8 +73,9 @@ class PiePagina extends ConsumerWidget {
           ('Contacto', () => unawaited(mostrarContacto(context))),
         ],
       ),
-      _Columna(
+      _Seccion(
         titulo: 'Legal',
+        icono: Icons.shield_outlined,
         enlaces: [
           (
             'Términos y condiciones',
@@ -136,12 +142,14 @@ class PiePagina extends ConsumerWidget {
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1480),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(32, 40, 32, 24),
-            child: LayoutBuilder(
-              builder: (context, r) {
-                final ancho = r.maxWidth >= anchoColumnas;
-                return Column(
+          child: LayoutBuilder(
+            builder: (context, r) {
+              final ancho = r.maxWidth >= anchoColumnas;
+              final enFila = r.maxWidth >= anchoCajasEnFila;
+              final lado = enFila ? 32.0 : 20.0;
+              return Padding(
+                padding: EdgeInsets.fromLTRB(lado, 40, lado, 24),
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     if (ancho)
@@ -149,22 +157,32 @@ class PiePagina extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(flex: 2, child: marca(centrada: false)),
-                          for (final c in columnas) Expanded(child: c),
+                          for (final s in secciones)
+                            Expanded(child: _Columna(s)),
                         ],
                       )
                     else ...[
                       marca(centrada: true),
                       const SizedBox(height: Espacios.xl),
-                      // De 2 a 3 columnas de enlaces por fila.
-                      Wrap(
-                        alignment: WrapAlignment.center,
-                        spacing: Espacios.xl,
-                        runSpacing: Espacios.xl,
-                        children: [
-                          for (final c in columnas)
-                            SizedBox(width: 180, child: c),
+                      // Una caja por sección: apiladas en el celular y en
+                      // fila en la tablet.
+                      if (enFila)
+                        IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              for (var i = 0; i < secciones.length; i++) ...[
+                                if (i > 0) const SizedBox(width: Espacios.m),
+                                Expanded(child: _Caja(secciones[i])),
+                              ],
+                            ],
+                          ),
+                        )
+                      else
+                        for (var i = 0; i < secciones.length; i++) ...[
+                          if (i > 0) const SizedBox(height: Espacios.m),
+                          _Caja(secciones[i]),
                         ],
-                      ),
                     ],
                     const SizedBox(height: Espacios.xl),
                     const Divider(height: 1, color: Colores.divisor),
@@ -194,9 +212,9 @@ class PiePagina extends ConsumerWidget {
                       ),
                     ],
                   ],
-                );
-              },
-            ),
+                ),
+              );
+            },
           ),
         ),
       ),
@@ -204,22 +222,33 @@ class PiePagina extends ConsumerWidget {
   }
 }
 
-class _Columna extends StatelessWidget {
-  const _Columna({required this.titulo, required this.enlaces});
+/// Una sección del pie: título, ícono y sus enlaces.
+class _Seccion {
+  const _Seccion({
+    required this.titulo,
+    required this.icono,
+    required this.enlaces,
+  });
 
   final String titulo;
+  final IconData icono;
   final List<(String, VoidCallback)> enlaces;
+}
+
+/// Sección en columna, para el pie de escritorio.
+class _Columna extends StatelessWidget {
+  const _Columna(this.seccion);
+
+  final _Seccion seccion;
 
   @override
   Widget build(BuildContext context) {
-    final centrado = MediaQuery.sizeOf(context).width < PiePagina.anchoColumnas;
+    final enlaces = seccion.enlaces;
     return Column(
-      crossAxisAlignment: centrado
-          ? CrossAxisAlignment.center
-          : CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          titulo,
+          seccion.titulo,
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
             fontSize: 13,
             fontWeight: FontWeight.w800,
@@ -232,6 +261,110 @@ class _Columna extends StatelessWidget {
           EnlacePie(texto: enlaces[i].$1, onTap: enlaces[i].$2),
         ],
       ],
+    );
+  }
+}
+
+/// Sección en caja, para el pie en celular y tablet.
+class _Caja extends StatelessWidget {
+  const _Caja(this.seccion);
+
+  final _Seccion seccion;
+
+  @override
+  Widget build(BuildContext context) {
+    final enlaces = seccion.enlaces;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colores.lienzo,
+        borderRadius: BorderRadius.circular(Radios.grande),
+        border: Border.all(color: Colores.linea),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          Espacios.l,
+          Espacios.l,
+          Espacios.s,
+          Espacios.s,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: const BoxDecoration(
+                    color: Colores.primarioSuave,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(seccion.icono, size: 18, color: Colores.primario),
+                ),
+                const SizedBox(width: Espacios.m),
+                Expanded(
+                  child: Text(
+                    seccion.titulo,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: Colores.tinta,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: Espacios.s),
+            for (var i = 0; i < enlaces.length; i++) ...[
+              if (i > 0)
+                const Divider(
+                  height: 1,
+                  endIndent: Espacios.s,
+                  color: Colores.divisor,
+                ),
+              _EnlaceCaja(texto: enlaces[i].$1, onTap: enlaces[i].$2),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Enlace a lo ancho de la caja, con flecha para que se lea tocable.
+class _EnlaceCaja extends StatelessWidget {
+  const _EnlaceCaja({required this.texto, required this.onTap});
+
+  final String texto;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      link: true,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(Radios.pequeno),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 44),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  texto,
+                  style: Theme.of(context).textTheme.bodySmall
+                      ?.copyWith(fontSize: 13.5, color: Colores.tintaSuave),
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right,
+                size: 20,
+                color: Colores.tintaGris,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
