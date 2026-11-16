@@ -90,6 +90,7 @@ Future<void> _montar(
   required EstadoSolicitud estado,
   required List<Cotizacion> ofertas,
   Size tamano = const Size(1440, 1400),
+  int? miCalificacion,
 }) async {
   tester.view
     ..physicalSize = tamano
@@ -100,6 +101,7 @@ Future<void> _montar(
     fotos: const [],
     cotizaciones: ofertas,
     usuario: _cliente,
+    miCalificacion: miCalificacion,
   );
   await tester.pumpWidget(
     ProviderScope(
@@ -251,5 +253,59 @@ void main() {
       tester.getTopLeft(find.text('Detalles del problema')).dy,
       lessThan(tester.getTopLeft(find.text('Ofertas recibidas')).dy),
     );
+  });
+
+  group('trabajo por confirmar', () {
+    final aceptada = [
+      _oferta('a', 'Marco Vinueza', 25, estado: EstadoCotizacion.aceptada),
+    ];
+    for (final tamano in [const Size(390, 900), const Size(1440, 1400)]) {
+      testWidgets(
+        '"Reportar problema" junto a confirmar a ${tamano.width} px',
+        (tester) async {
+          await _montar(
+            tester,
+            estado: EstadoSolicitud.porConfirmar,
+            ofertas: aceptada,
+            tamano: tamano,
+          );
+          expect(find.text('Confirmar trabajo terminado'), findsOneWidget);
+          expect(find.text('Reportar problema'), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  });
+
+  group('trabajo completado', () {
+    final aceptada = [
+      _oferta('a', 'Marco Vinueza', 25, estado: EstadoCotizacion.aceptada),
+    ];
+
+    testWidgets('sin calificar ofrece las estrellas', (tester) async {
+      await _montar(
+        tester,
+        estado: EstadoSolicitud.completada,
+        ofertas: aceptada,
+        tamano: const Size(390, 900),
+      );
+      expect(find.text('Calificar al técnico'), findsOneWidget);
+      expect(find.text('Ya calificaste'), findsNothing);
+    });
+
+    testWidgets('ya calificado muestra la nota y no vuelve a pedirla', (
+      tester,
+    ) async {
+      await _montar(
+        tester,
+        estado: EstadoSolicitud.completada,
+        ofertas: aceptada,
+        tamano: const Size(390, 900),
+        miCalificacion: 4,
+      );
+      expect(find.text('Calificar al técnico'), findsNothing);
+      expect(find.text('Ya calificaste'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
   });
 }

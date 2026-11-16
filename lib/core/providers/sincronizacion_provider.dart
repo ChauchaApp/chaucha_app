@@ -8,6 +8,7 @@ import '../../features/solicitudes/presentation/providers/agenda_provider.dart';
 import '../../features/solicitudes/presentation/providers/detalle_provider.dart';
 import '../../features/solicitudes/presentation/providers/feed_provider.dart';
 import '../../features/solicitudes/presentation/providers/listas_provider.dart';
+import '../../features/solicitudes/presentation/providers/mapa_tecnico_provider.dart';
 import '../../features/solicitudes/presentation/providers/visitas_agenda_provider.dart';
 import 'core_providers.dart';
 
@@ -22,6 +23,7 @@ final sincronizacionProvider = Provider.autoDispose<void>((ref) {
         ..invalidate(misSolicitudesProvider)
         ..invalidate(misTrabajosProvider)
         ..invalidate(feedProvider)
+        ..invalidate(solicitudesEnMapaProvider)
         ..invalidate(detalleSolicitudProvider)
         ..invalidate(agendaProvider)
         ..invalidate(visitasRangoProvider)

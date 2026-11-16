@@ -38,6 +38,7 @@ import '../../../perfil_puntos/presentation/widgets/escucha_calificaciones.dart'
 import '../../../perfil_puntos/presentation/widgets/resena_dialog.dart';
 import '../../../planes/presentation/providers/planes_provider.dart';
 import '../../../planes/presentation/widgets/limite_plan.dart';
+import '../../../reclamos/presentation/widgets/formulario_reclamo.dart';
 import '../../../reclamos/presentation/widgets/tarjeta_garantia.dart';
 import '../../domain/entities/detalle_solicitud.dart';
 import '../../domain/entities/foto_solicitud.dart';
@@ -381,7 +382,7 @@ class _SolicitudDetalleViewState extends ConsumerState<SolicitudDetalleView> {
     // La barra y el menú solo existen cuando se ven los datos (no en error).
     final datos = valor.hasError ? null : valor.value;
     final accion = datos == null ? null : _accionPrincipal(datos);
-    final boton = accion == null
+    Widget? boton = accion == null
         ? null
         : BotonCarga(
             texto: accion.texto,
@@ -389,6 +390,26 @@ class _SolicitudDetalleViewState extends ConsumerState<SolicitudDetalleView> {
             cargando: procesando,
             onPressed: accion.alPulsar,
           );
+    if (datos != null && boton != null && _puedeReportar(datos)) {
+      // Antes de confirmar, el cliente puede avisar que algo salió mal.
+      boton = _ConfirmarOReportar(
+        confirmar: boton,
+        onReportar: procesando
+            ? null
+            : () => unawaited(
+                reportarProblema(
+                  context,
+                  solicitudId: widget.solicitudId,
+                  esCliente: true,
+                ),
+              ),
+      );
+    } else if (datos != null &&
+        boton == null &&
+        datos.estado == EstadoSolicitud.completada &&
+        datos.miCalificacion != null) {
+      boton = _YaCalificado(estrellas: datos.miCalificacion!);
+    }
 
     return PantallaSecundaria(
       titulo: 'Detalle de la solicitud',
@@ -597,6 +618,9 @@ class _SolicitudDetalleViewState extends ConsumerState<SolicitudDetalleView> {
     );
   }
 
+  bool _puedeReportar(DetalleSolicitud d) =>
+      d.soyCliente && d.estado == EstadoSolicitud.porConfirmar;
+
   _Accion? _accionPrincipal(DetalleSolicitud d) {
     final estado = d.estado;
     if (d.soyCliente) {
@@ -608,7 +632,9 @@ class _SolicitudDetalleViewState extends ConsumerState<SolicitudDetalleView> {
           alPulsar: _confirmarTerminado,
         );
       }
-      if (estado == EstadoSolicitud.completada && aceptada != null) {
+      if (estado == EstadoSolicitud.completada &&
+          aceptada != null &&
+          !d.yaCalifique) {
         return (
           texto: 'Calificar al técnico',
           icono: Icons.star_outline,
@@ -635,7 +661,9 @@ class _SolicitudDetalleViewState extends ConsumerState<SolicitudDetalleView> {
         alPulsar: _marcarTerminada,
       );
     }
-    if (d.soyTecnicoAsignado && estado == EstadoSolicitud.completada) {
+    if (d.soyTecnicoAsignado &&
+        estado == EstadoSolicitud.completada &&
+        !d.yaCalifique) {
       return (
         texto: 'Calificar al cliente',
         icono: Icons.star_outline,
@@ -866,6 +894,107 @@ class _Escritorio extends StatelessWidget {
         ),
         const SizedBox(height: Espacios.xxl),
       ],
+    );
+  }
+}
+
+/// "Confirmar trabajo" con "Reportar problema" al lado (debajo en el celular).
+class _ConfirmarOReportar extends StatelessWidget {
+  const _ConfirmarOReportar({
+    required this.confirmar,
+    required this.onReportar,
+  });
+
+  final Widget confirmar;
+  final VoidCallback? onReportar;
+
+  @override
+  Widget build(BuildContext context) {
+    final reportar = OutlinedButton.icon(
+      onPressed: onReportar,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: Colores.error,
+        side: const BorderSide(color: Colores.error),
+      ),
+      icon: const Icon(Icons.report_problem_outlined),
+      label: const Text('Reportar problema'),
+    );
+    return LayoutBuilder(
+      builder: (context, r) {
+        // En el celular no caben lado a lado sin partir el texto: van uno
+        // sobre otro, con confirmar arriba.
+        if (r.maxWidth < 560) {
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              confirmar,
+              const SizedBox(height: Espacios.s),
+              reportar,
+            ],
+          );
+        }
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            reportar,
+            const SizedBox(width: Espacios.m),
+            confirmar,
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// En lugar del botón de calificar, cuando ya se calificó.
+class _YaCalificado extends StatelessWidget {
+  const _YaCalificado({required this.estrellas});
+
+  final int estrellas;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'Ya calificaste con $estrellas de 5 estrellas',
+      excludeSemantics: true,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: Espacios.l,
+          vertical: Espacios.m,
+        ),
+        decoration: BoxDecoration(
+          color: Colores.primarioSuave,
+          borderRadius: BorderRadius.circular(Radios.pildora),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.check_circle, size: 20, color: Colores.primario),
+            const SizedBox(width: Espacios.s),
+            Flexible(
+              child: Text(
+                'Ya calificaste',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: Colores.primario,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            const SizedBox(width: Espacios.s),
+            for (var i = 1; i <= 5; i++)
+              Icon(
+                i <= estrellas
+                    ? Icons.star_rounded
+                    : Icons.star_outline_rounded,
+                size: 18,
+                color: Colores.estrella,
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

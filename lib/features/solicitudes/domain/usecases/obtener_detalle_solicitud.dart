@@ -16,16 +16,18 @@ class ObtenerDetalleSolicitud {
   final CotizacionRepository _cotizaciones;
 
   Future<DetalleSolicitud> call(String solicitudId, Usuario usuario) async {
-    final resultados = await Future.wait<Object>([
+    final resultados = await Future.wait<Object?>([
       _solicitudes.obtener(solicitudId),
       _solicitudes.fotos(solicitudId),
       _cotizaciones.deSolicitud(solicitudId),
+      _solicitudes.miCalificacion(solicitudId),
     ]);
     return DetalleSolicitud(
       solicitud: resultados[0] as Solicitud,
       fotos: resultados[1] as List<FotoSolicitud>,
       cotizaciones: resultados[2] as List<Cotizacion>,
       usuario: usuario,
+      miCalificacion: resultados[3] as int?,
     );
   }
 }

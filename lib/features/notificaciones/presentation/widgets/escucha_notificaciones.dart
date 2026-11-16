@@ -7,6 +7,7 @@ import '../../../../core/widgets/mensajes.dart';
 import '../../../auth/presentation/providers/sesion_provider.dart';
 import '../../../perfil_puntos/presentation/providers/verificacion_provider.dart';
 import '../../../solicitudes/presentation/providers/feed_provider.dart';
+import '../../../solicitudes/presentation/providers/mapa_tecnico_provider.dart';
 import '../../domain/entities/notificacion.dart';
 import '../providers/notificaciones_provider.dart';
 
@@ -30,7 +31,9 @@ class _EstadoEscucha extends ConsumerState<EscuchaNotificaciones> {
     if (verificacion) ref.invalidate(verificacionProvider);
     // Por si el tiempo real de solicitudes se cortó: el aviso trae el trabajo.
     if (nuevas.any((n) => n.tipo == 'solicitud_nueva')) {
-      ref.invalidate(feedProvider);
+      ref
+        ..invalidate(feedProvider)
+        ..invalidate(solicitudesEnMapaProvider);
     }
     if (nuevas.any((n) => recargan.contains(n.tipo))) {
       try {

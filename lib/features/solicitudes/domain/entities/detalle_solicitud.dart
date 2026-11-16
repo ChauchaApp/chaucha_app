@@ -12,6 +12,7 @@ class DetalleSolicitud {
     required this.fotos,
     required this.cotizaciones,
     required this.usuario,
+    this.miCalificacion,
   });
 
   final Solicitud solicitud;
@@ -20,6 +21,11 @@ class DetalleSolicitud {
 
   /// Quien está viendo el detalle.
   final Usuario usuario;
+
+  /// Estrellas que ya dio quien ve el detalle; null si aún no calificó.
+  final int? miCalificacion;
+
+  bool get yaCalifique => miCalificacion != null;
 
   bool get soyCliente => usuario.rol == Rol.cliente;
 

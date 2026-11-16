@@ -186,6 +186,19 @@ class SupabaseSolicitudRepository implements SolicitudRepository {
   }
 
   @override
+  Future<int?> miCalificacion(String solicitudId) {
+    return supabaseGuard(() async {
+      final fila = await _client
+          .from('resenas')
+          .select('calificacion')
+          .eq('solicitud_id', solicitudId)
+          .eq('autor_id', _client.uidActual)
+          .maybeSingle();
+      return fila?['calificacion'] as int?;
+    });
+  }
+
+  @override
   Future<List<FotoSolicitud>> fotos(String solicitudId) {
     return supabaseGuard(() async {
       final filas = await _client

@@ -112,6 +112,9 @@ class SolicitudesFalsas implements SolicitudRepository {
   Future<List<FotoSolicitud>> fotos(String solicitudId) async => const [];
 
   @override
+  Future<int?> miCalificacion(String solicitudId) async => null;
+
+  @override
   Future<List<ServicioCompletado>> historialServicios(
     String clienteId, {
     int limite = 50,

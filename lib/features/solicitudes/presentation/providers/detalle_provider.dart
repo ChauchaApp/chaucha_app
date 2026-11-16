@@ -139,7 +139,6 @@ class AccionesSolicitudNotifier extends AsyncNotifier<void> {
               etiquetas: etiquetas,
             ),
           ),
-      recargar: false,
     );
   }
 

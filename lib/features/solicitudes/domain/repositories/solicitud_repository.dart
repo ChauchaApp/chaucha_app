@@ -26,6 +26,10 @@ abstract interface class SolicitudRepository {
   Future<Solicitud> obtener(String id);
 
   Future<List<FotoSolicitud>> fotos(String solicitudId);
+
+  /// Estrellas que el usuario actual ya dio en esta solicitud (null si aún
+  /// no calificó).
+  Future<int?> miCalificacion(String solicitudId);
   Future<List<Solicitud>> porIds(List<String> ids);
   Future<void> cambiarEstado(String solicitudId, EstadoSolicitud estado);
   Future<void> editar(
