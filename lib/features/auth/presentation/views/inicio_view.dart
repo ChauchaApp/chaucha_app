@@ -435,8 +435,11 @@ class _BloqueChats extends ConsumerWidget {
     final chats = ref.watch(misChatsProvider);
     final noLeidas =
         ref.watch(notificacionesNoLeidasProvider).value ?? const [];
-    int sinLeerDe(String id) => noLeidas
-        .where((n) => tiposDeChat.contains(n.tipo) && n.referenciaId == id)
+    int sinLeerDe(ResumenChat chat) => noLeidas
+        .where(
+          (n) =>
+              tiposDeChat.contains(n.tipo) && chat.ids.contains(n.referenciaId),
+        )
         .length;
 
     return ResumenChats(
@@ -467,7 +470,7 @@ class _BloqueChats extends ConsumerWidget {
               for (var i = 0; i < recientes.length && i < 3; i++)
                 FilaChat(
                   chat: recientes[i],
-                  sinLeer: sinLeerDe(recientes[i].conversacionId),
+                  sinLeer: sinLeerDe(recientes[i]),
                   cielo: i.isOdd,
                   onTap: () => unawaited(
                     abrirChat(

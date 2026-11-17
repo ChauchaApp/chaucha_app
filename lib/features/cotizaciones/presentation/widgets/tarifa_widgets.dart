@@ -9,6 +9,7 @@ import '../../../../core/widgets/mensajes.dart';
 import '../../../../core/widgets/pildora.dart';
 import '../../../../core/widgets/tarjeta_app.dart';
 import '../../domain/entities/cotizacion.dart';
+import '../../domain/entities/reglas_tarifa.dart';
 import '../../domain/entities/tarifa.dart';
 import 'selector_franja.dart';
 
@@ -353,9 +354,7 @@ class _FormularioTarifaState extends State<_FormularioTarifa> {
   String? _validarPrecio(String? valor) {
     final error = FormValidators.monto(valor, campo: 'El precio de la visita');
     if (error != null) return error;
-    return (_leer(_precio) ?? 0) <= 0
-        ? 'El precio de la visita debe ser mayor que 0.'
-        : null;
+    return ReglasTarifa.validarPrecioVisita(_leer(_precio) ?? 0);
   }
 
   Future<void> _elegirFecha() async {

@@ -40,15 +40,19 @@ class SupabaseChatRepository implements ChatRepository {
     });
   }
 
-  /// Dos consultas: las conversaciones del técnico (con el oficio de su
-  /// solicitud) y sus mensajes más recientes, para ver quién escribió último.
+  /// Dos consultas: las conversaciones del técnico (con el cliente y el oficio
+  /// de su solicitud) y sus mensajes más recientes, para ver quién escribió
+  /// último. Un chat por cliente: cuenta el último mensaje entre todas las
+  /// conversaciones con esa persona.
   @override
   Future<List<ConversacionPendiente>> porResponder() {
     return supabaseGuard(() async {
       final uid = _client.uidActual;
       final conversaciones = await _client
           .from('conversaciones')
-          .select('id, solicitud_id, solicitudes_servicio(oficios(nombre))')
+          .select(
+            'id, solicitud_id, solicitudes_servicio(cliente_id, oficios(nombre))',
+          )
           .eq('tecnico_id', uid);
       if (conversaciones.isEmpty) return const [];
 
@@ -60,14 +64,24 @@ class SupabaseChatRepository implements ChatRepository {
           .order('enviado_en', ascending: false)
           .limit(_limiteMensajesRecientes);
 
-      final ultimo = <String, Map<String, dynamic>>{};
+      // Los mensajes vienen del más nuevo al más viejo: el primero que aparece
+      // de cada cliente es el último de su chat.
+      final conversacionPorId = {
+        for (final c in conversaciones) c['id'] as String: c,
+      };
+      final ultimoPorCliente = <String, Map<String, dynamic>>{};
       for (final m in mensajes) {
-        ultimo.putIfAbsent(m['conversacion_id'] as String, () => m);
+        final c = conversacionPorId[m['conversacion_id'] as String];
+        if (c == null) continue;
+        final cliente =
+            anidado(c['solicitudes_servicio'])?['cliente_id'] as String? ??
+            c['id'] as String;
+        ultimoPorCliente.putIfAbsent(cliente, () => m);
       }
       final pendientes = <ConversacionPendiente>[];
-      for (final c in conversaciones) {
-        final m = ultimo[c['id'] as String];
-        if (m == null || m['autor_id'] == uid) continue;
+      for (final m in ultimoPorCliente.values) {
+        if (m['autor_id'] == uid) continue;
+        final c = conversacionPorId[m['conversacion_id'] as String]!;
         final oficio = anidado(
           anidado(c['solicitudes_servicio'])?['oficios'],
         )?['nombre'];
@@ -159,8 +173,29 @@ class SupabaseChatRepository implements ChatRepository {
         if (fb == null) return -1;
         return fb.compareTo(fa);
       });
-      return chats;
+      return ResumenChat.agruparPorPersona(chats);
     });
+  }
+
+  /// La conversación [conversacionId] y las demás entre el mismo cliente y
+  /// el mismo técnico (una por solicitud), para mostrarlas como un solo chat.
+  Future<List<String>> _conMismaPersona(String conversacionId) async {
+    final fila = await _client
+        .from('conversaciones')
+        .select('tecnico_id, solicitudes_servicio(cliente_id)')
+        .eq('id', conversacionId)
+        .maybeSingle();
+    final cliente = anidado(fila?['solicitudes_servicio'])?['cliente_id'];
+    if (fila == null || cliente is! String) return [conversacionId];
+    final hermanas = await _client
+        .from('conversaciones')
+        .select('id, solicitudes_servicio!inner(cliente_id)')
+        .eq('tecnico_id', fila['tecnico_id'] as String)
+        .eq('solicitudes_servicio.cliente_id', cliente);
+    return {
+      conversacionId,
+      for (final c in hermanas) c['id'] as String,
+    }.toList();
   }
 
   /// Suficiente para cubrir el último mensaje de las conversaciones activas.
@@ -180,14 +215,19 @@ class SupabaseChatRepository implements ChatRepository {
     });
   }
 
-  /// `.stream()` hace la consulta inicial y luego escucha los INSERT.
+  /// Un solo hilo con todos los mensajes entre las dos personas, de todas
+  /// sus conversaciones. `.stream()` hace la consulta inicial y luego escucha
+  /// los INSERT.
   @override
   Stream<List<Mensaje>> mensajes(String conversacionId) {
-    return _client
-        .from('mensajes')
-        .stream(primaryKey: ['id'])
-        .eq('conversacion_id', conversacionId)
-        .order('enviado_en', ascending: true)
+    return Stream.fromFuture(_conMismaPersona(conversacionId))
+        .asyncExpand(
+          (ids) => _client
+              .from('mensajes')
+              .stream(primaryKey: ['id'])
+              .inFilter('conversacion_id', ids)
+              .order('enviado_en', ascending: true),
+        )
         .map(
           (filas) => filas
               .map((fila) => MensajeModel.fromJson(fila).aEntidad())

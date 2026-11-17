@@ -9,6 +9,21 @@ import '../solicitudes/falsos.dart';
 const _tarifa = Tarifa(precioAcordado: 40);
 
 void main() {
+  group('ReglasTarifa.validarPrecioVisita', () {
+    test(r'acepta $15 o más', () {
+      expect(ReglasTarifa.validarPrecioVisita(15), isNull);
+      expect(ReglasTarifa.validarPrecioVisita(25), isNull);
+    });
+
+    test(r'rechaza menos de $15', () {
+      expect(
+        ReglasTarifa.validarPrecioVisita(14.99),
+        r'El precio mínimo de la visita es $15.',
+      );
+      expect(ReglasTarifa.validarPrecioVisita(0), isNotNull);
+    });
+  });
+
   group('ReglasTarifa.motivoParaNoEnviar', () {
     String? motivo({
       bool soyCliente = false,

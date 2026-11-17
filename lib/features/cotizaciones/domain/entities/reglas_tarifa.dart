@@ -2,6 +2,17 @@ import '../../../solicitudes/domain/entities/solicitud.dart';
 import 'cotizacion.dart';
 
 abstract final class ReglasTarifa {
+  /// Precio mínimo de la visita en USD. La base lo exige también
+  /// (migración `visita_minima_15`).
+  static const double precioMinimoVisita = 15;
+
+  /// Error si [precio] está por debajo del mínimo de la visita, o null.
+  static String? validarPrecioVisita(double precio) =>
+      precio < precioMinimoVisita
+      ? 'El precio mínimo de la visita es '
+            '\$${precioMinimoVisita.toStringAsFixed(0)}.'
+      : null;
+
   /// Por qué el técnico no puede enviar el ticket, o null si puede.
   static String? motivoParaNoEnviar({
     required bool soyCliente,

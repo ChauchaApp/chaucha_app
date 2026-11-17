@@ -80,18 +80,24 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
     _abierta = ref.read(conversacionAbiertaProvider.notifier);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _abierta.abrir(widget.conversacionId);
-      final uid = ref.read(supabaseClientProvider).auth.currentUser?.id;
-      if (uid == null) return;
-      unawaited(
-        ref
-            .read(notificacionesRepoProvider)
-            .marcarLeidas(
-              uid,
-              tipos: const ['mensaje', 'chat'],
-              referenciaId: widget.conversacionId,
-            ),
-      );
+      _marcarLeidas([widget.conversacionId]);
     });
+  }
+
+  /// Marca como leídos los avisos de chat de esas conversaciones.
+  void _marcarLeidas(Iterable<String> conversacionIds) {
+    final uid = ref.read(supabaseClientProvider).auth.currentUser?.id;
+    if (uid == null) return;
+    final repo = ref.read(notificacionesRepoProvider);
+    for (final id in conversacionIds) {
+      unawaited(
+        repo.marcarLeidas(
+          uid,
+          tipos: const ['mensaje', 'chat'],
+          referenciaId: id,
+        ),
+      );
+    }
   }
 
   @override
@@ -181,9 +187,15 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
 
     ref.listen(mensajesProvider(id), (anterior, actual) {
       final antes = anterior?.value?.length;
-      if (antes != null && actual.value?.length != antes) {
-        ref.invalidate(contextoChatProvider(id));
-      }
+      final ahora = actual.value;
+      if (ahora == null || ahora.length == antes) return;
+      if (antes != null) ref.invalidate(contextoChatProvider(id));
+      // El hilo junta las conversaciones con esta persona: sus avisos también
+      // se leen aquí. Los de esta conversación ya no llegan (presencia).
+      _marcarLeidas({
+        for (final m in ahora)
+          if (m.conversacionId != id) m.conversacionId,
+      });
     });
 
     final contexto = ref.watch(contextoChatProvider(id));
@@ -336,9 +348,14 @@ class _MensajesState extends State<_Mensajes> {
     final vistos = _vistos;
     final elementos = <Widget>[];
     String? diaAnterior;
+    // El hilo puede traer tickets de otras solicitudes con esta persona:
+    // solo el último de la oferta actual puede estar pendiente.
     String? idUltimoTicket;
     for (final m in widget.mensajes) {
-      if (m.accion == 'tarifa_enviada') idUltimoTicket = m.id;
+      if (m.accion == 'tarifa_enviada' &&
+          m.datos?['cotizacion_id'] == widget.oferta?.id) {
+        idUltimoTicket = m.id;
+      }
     }
     for (final m in widget.mensajes) {
       final dia = Formatos.dia(m.enviadoEn);

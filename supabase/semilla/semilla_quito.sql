@@ -158,7 +158,7 @@ begin
     if i <= 60 then
       -- Planes: 8 Plus, 12 Pro, 40 Gratis.
       plan := case when i % 15 in (1, 8) then 'plus' when i % 5 = 2 then 'pro' else 'gratis' end;
-      tarifa := (array[12, 15, 15, 18, 20, 20, 20, 25, 25, 30])[1 + floor(random() * 10)::int];
+      tarifa := (array[15, 15, 15, 18, 20, 20, 20, 25, 25, 30])[1 + floor(random() * 10)::int];
       update public.perfiles_tecnicos set tarifa_base = tarifa,
         rango_cobertura_m = (array[5000, 8000, 10000, 12000, 15000])[1 + floor(random() * 5)::int],
         ubicacion_actual = st_setsrid(st_makepoint(lng, lat), 4326)::geography
@@ -184,8 +184,8 @@ begin
       end loop;
       foreach o in array ofs loop
         insert into public.tecnico_oficios (tecnico_id, oficio_id, tarifa_visita)
-        values (uid, o, case when o >= 21 then tarifa + 10 else tarifa end
-                        + (array[0, 0, 0, 5, -3, 5, 10])[1 + floor(random() * 7)::int]);
+        values (uid, o, greatest(15, case when o >= 21 then tarifa + 10 else tarifa end
+                        + (array[0, 0, 0, 5, -3, 5, 10])[1 + floor(random() * 7)::int]));
       end loop;
       -- Certificaciones: 1 de cada 3 técnicos tiene una aprobada; algunos, una pendiente.
       if i % 3 = 0 then

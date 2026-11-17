@@ -60,7 +60,26 @@ void main() {
 
       expect(ok, isFalse);
       expect(cotizaciones.tarifasEnviadas, isEmpty);
-      expect(errorDe(c), contains('mayor que 0'));
+      expect(errorDe(c), contains(r'mínimo de la visita es $15'));
+    });
+
+    test(r'con precio menor a $15 no envía', () async {
+      final c = contenedor(contextoDePrueba());
+
+      final ok = await acciones(c)
+          .enviar(const NuevaTarifa(precioAcordado: 14.99));
+
+      expect(ok, isFalse);
+      expect(cotizaciones.tarifasEnviadas, isEmpty);
+    });
+
+    test(r'con precio de $15 justo envía', () async {
+      final c = contenedor(contextoDePrueba());
+
+      final ok = await acciones(c)
+          .enviar(const NuevaTarifa(precioAcordado: 15));
+
+      expect(ok, isTrue);
     });
 
     test('con un ticket esperando respuesta no envía otro', () async {
