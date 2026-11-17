@@ -160,6 +160,7 @@ Todas las que usan Redis siguen funcionando si Upstash no responde (*fail-open*)
 - [`docs/ARQUITECTURA_DIAGRAMA.md`](docs/ARQUITECTURA_DIAGRAMA.md): diagrama de componentes.
 - [`docs/ARQUITECTURA_TECNICA.md`](docs/ARQUITECTURA_TECNICA.md): cómo está implementada cada pieza, con sus archivos, tablas y funciones.
 - [`docs/DISENO.md`](docs/DISENO.md): sistema de diseño.
+- [`docs/MODELO_DATOS.md`](docs/MODELO_DATOS.md): modelo de datos de Supabase (diagramas entidad-relación en Mermaid).
 
 ---
 
