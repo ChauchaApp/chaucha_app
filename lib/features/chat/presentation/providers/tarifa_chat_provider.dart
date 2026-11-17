@@ -43,9 +43,8 @@ class AccionesTarifaNotifier extends AsyncNotifier<void> {
   /// avisa al cliente en el chat. El precio de la visita de su oferta no cambia.
   Future<bool> enviar(NuevaTarifa tarifa) {
     return _ejecutar(() async {
-      if (tarifa.precioAcordado <= 0) {
-        throw const AppFailure('El precio acordado debe ser mayor que 0.');
-      }
+      final error = ReglasTarifa.validarPrecioVisita(tarifa.precioAcordado);
+      if (error != null) throw AppFailure(error);
       final contexto = await _contexto();
       final motivo = ReglasTarifa.motivoParaNoEnviar(
         soyCliente: false,

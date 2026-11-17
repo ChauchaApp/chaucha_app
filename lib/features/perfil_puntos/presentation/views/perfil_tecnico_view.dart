@@ -27,6 +27,7 @@ import '../../../auth/presentation/views/perfil_cliente_view.dart';
 import '../../../catalogo/domain/entities/oficio.dart';
 import '../../../catalogo/presentation/providers/oficios_provider.dart';
 import '../../../catalogo/presentation/widgets/icono_oficio.dart';
+import '../../../cotizaciones/domain/entities/reglas_tarifa.dart';
 import '../../../planes/presentation/widgets/entrada_mi_plan.dart';
 import '../../../planes/presentation/widgets/limite_plan.dart';
 import '../../../publicidad/domain/entities/anuncio.dart';
@@ -599,10 +600,15 @@ class _DatosTrabajo extends ConsumerWidget {
                                   ),
                               decoration: const InputDecoration(
                                 prefixIcon: Icon(Icons.attach_money),
-                                hintText: '0.00',
+                                hintText: '15.00',
                               ),
                               validator: (v) =>
-                                  FormValidators.monto(v, campo: 'El precio'),
+                                  FormValidators.monto(v, campo: 'El precio') ??
+                                  ReglasTarifa.validarPrecioVisita(
+                                    double.parse(
+                                      v!.trim().replaceAll(',', '.'),
+                                    ),
+                                  ),
                             ),
                           ),
                         ],

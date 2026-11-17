@@ -2,7 +2,7 @@
 
 Modelo de datos del esquema `public` de Supabase (PostgreSQL 17 + PostGIS).
 
-- **Fuente:** las migraciones de `supabase/migrations/`, hasta `20261115200000_reclamo_antes_de_confirmar.sql`.
+- **Fuente:** las migraciones de `supabase/migrations/`, hasta `20261117120000_visita_minima_15.sql`.
 - **Revisado el:** 17/11/2026.
 - **Tamaño:** 31 tablas. Todas tienen RLS activado.
 
@@ -281,7 +281,7 @@ erDiagram
     tecnico_oficios {
         uuid tecnico_id PK, FK
         int oficio_id PK, FK
-        numeric tarifa_visita ">= 0"
+        numeric tarifa_visita ">= 15"
         boolean activo
     }
     solicitud_archivos {
@@ -295,7 +295,7 @@ erDiagram
         uuid id PK
         uuid solicitud_id FK, UK "única con tecnico_id"
         uuid tecnico_id FK, UK
-        numeric precio_base "0 a 25"
+        numeric precio_base "15 a 25"
         numeric mano_obra "null hasta enviar tarifa"
         numeric materiales ">= 0"
         numeric total "generada: mano_obra + materiales"
@@ -349,6 +349,9 @@ Reglas que impone la base en `cotizaciones`:
 - No se puede aceptar una cotización sin tarifa (`ck_cotizaciones_aceptada_con_tarifa`), ni ponerle fecha sin tarifa (`ck_cotizaciones_fecha_con_tarifa`).
 - `fin_visita` tiene que ser posterior a `inicio_visita`.
 - Un técnico no puede tener dos visitas aceptadas que se crucen en el tiempo (restricción `exclude using gist`, `ex_cotizaciones_sin_choque`).
+- La visita cuesta al menos $15: lo exigen los triggers `trg_visita_minima_oficio` (precio por oficio en `tecnico_oficios.tarifa_visita`) y `trg_cotizacion_visita_minima` (`precio_base` de las ofertas nuevas y `mano_obra` del ticket). Las ofertas anteriores a la regla se respetan.
+
+El chat se guarda con una conversación por solicitud y técnico, pero la app junta las de la misma pareja cliente-técnico en un solo chat: la lista muestra una fila por persona y el hilo trae los mensajes de todas.
 
 ---
 

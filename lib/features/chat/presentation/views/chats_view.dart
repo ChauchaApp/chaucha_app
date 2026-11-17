@@ -66,10 +66,10 @@ class _ChatsViewState extends ConsumerState<ChatsView> {
     final textos = Theme.of(context).textTheme;
     final noLeidas =
         ref.watch(notificacionesNoLeidasProvider).value ?? const [];
-    int sinLeerDe(String conversacionId) => noLeidas
+    int sinLeerDe(ResumenChat chat) => noLeidas
         .where(
           (n) =>
-              tiposDeChat.contains(n.tipo) && n.referenciaId == conversacionId,
+              tiposDeChat.contains(n.tipo) && chat.ids.contains(n.referenciaId),
         )
         .length;
     final totalSinLeer = noLeidas
@@ -150,7 +150,7 @@ class _ChatsViewState extends ConsumerState<ChatsView> {
     );
   }
 
-  Widget _lista(List<ResumenChat> chats, int Function(String) sinLeerDe) {
+  Widget _lista(List<ResumenChat> chats, int Function(ResumenChat) sinLeerDe) {
     if (chats.isEmpty) {
       return EstadoMensaje(
         icono: Icons.chat_bubble_outline_rounded,
@@ -169,8 +169,7 @@ class _ChatsViewState extends ConsumerState<ChatsView> {
         (c.oficio?.toLowerCase().contains(consulta) ?? false);
     final visibles = [
       for (final c in chats)
-        if (coincide(c) && (!_soloSinLeer || sinLeerDe(c.conversacionId) > 0))
-          c,
+        if (coincide(c) && (!_soloSinLeer || sinLeerDe(c) > 0)) c,
     ];
 
     if (visibles.isEmpty) {
@@ -195,7 +194,7 @@ class _ChatsViewState extends ConsumerState<ChatsView> {
               if (i > 0) const Divider(height: 1),
               _FilaChat(
                 chat: visibles[i],
-                sinLeer: sinLeerDe(visibles[i].conversacionId),
+                sinLeer: sinLeerDe(visibles[i]),
                 onTap: () => _abrir(visibles[i].conversacionId),
                 onVerPerfil: visibles[i].otroId.isEmpty
                     ? null
